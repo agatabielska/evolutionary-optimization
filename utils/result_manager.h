@@ -10,9 +10,11 @@ class ResultManager {
 public:
     int best_cost = std::numeric_limits<int>::max();
     int worst_cost = std::numeric_limits<int>::min();
-    int average_cost = 0;
+    int evaluations_count = 0;
+    long long total_cost = 0;
     int repetitions = 0;
     int dataset = 0;
+    int start_points = 1;
     int best_solution[200]{};
 
     void update_best_solution(int new_cost, const int* new_solution, int num_nodes) noexcept {
@@ -24,7 +26,8 @@ public:
         if (new_cost > worst_cost) {
             worst_cost = new_cost;
         }
-        average_cost += new_cost;
+        ++evaluations_count;
+        total_cost += new_cost;
     }
 
     void check_solution(const int* new_solution, int num_nodes) noexcept {
@@ -46,9 +49,14 @@ public:
             std::cerr << "Error opening file for writing: " << filename << std::endl;
             return;
         }
+
+        long long avg_rounded = (evaluations_count > 0) 
+            ? static_cast<long long>(std::round(total_cost / evaluations_count)) 
+            : 0;
+
         file << "Best Cost: " << best_cost << std::endl;
         file << "Worst Cost: " << worst_cost << std::endl;
-        file << "Average Cost: " << std::round(average_cost / repetitions) << std::endl;
+        file << "Average Cost: " << avg_rounded << std::endl;
         file << "Best Solution: ";
         for (int i = 0; i < num_nodes; ++i) {
             file << best_solution[i];
@@ -59,4 +67,5 @@ public:
         file << std::endl;
         file.close();
     }
+
 };
