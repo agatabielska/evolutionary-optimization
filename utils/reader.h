@@ -1,3 +1,4 @@
+#pragma once
 #include <iostream>
 #include <string>
 #include <vector>
@@ -5,12 +6,12 @@
 #include <sstream>
 #include "euclidean.h"
 
-std::vector<std::string> FILE_PATHS = {"./data/TSPA.csv", "./data/TSPB.csv"};
+inline std::vector<std::string> FILE_PATHS = {"./data/TSPA.csv", "./data/TSPB.csv"};
 
-int DISTANCE_MATRIX[200][200][2];
-int NODE_COST[200][2];
+inline int DISTANCE_MATRIX[200][200][2];
+inline int NODE_COST[200][2];
 
-void read_distance_matrix() {
+inline void read_distance_matrix() {
     for (int i = 0; i < 200; i++) {
         for (int j = 0; j < 200; j++) {
             DISTANCE_MATRIX[i][j][0] = -1;

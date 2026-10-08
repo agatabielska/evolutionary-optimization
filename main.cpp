@@ -1,18 +1,22 @@
 #include "utils/reader.h"
+#include "utils/result_manager.h"
+#include "solutions/task1.h"
 #include <iostream>
+#include <cmath>
 
 int main() {
-    std::cout << "--- Testing Utils ---" << std::endl;
-    
-    // Call the reader function
+    // Read the datasets and initialize the distance matrix and node costs
     read_distance_matrix();
+    
+    for (int dataset = 0; dataset < 2; ++dataset) {
 
-    // Verify distance matrix and node costs for some elements
-    std::cout << "\n--- Verification ---" << std::endl;
-    std::cout << "Distance from Node 0 to Node 1 on TSPA: " << DISTANCE_MATRIX[0][1][0] << std::endl;
-    std::cout << "Distance from Node 0 to Node 1 on TSPB: " << DISTANCE_MATRIX[0][1][1] << std::endl;
-    std::cout << "Cost of Node 0 on TSPA: " << NODE_COST[0][0] << std::endl;
-    std::cout << "Cost of Node 0 on TSPB: " << NODE_COST[0][1] << std::endl;
+        std::cout << "\n--- Dataset " << (dataset == 0 ? "TSPA" : "TSPB") << " ---" << std::endl;
+        ResultManager random_result_manager;
+        random_result_manager.repetitions = 200;
+        random_result_manager.dataset = dataset;
+        task1_random_solver(random_result_manager);
 
-    return 0;
+        random_result_manager.save_best_solution_to_file("calculated_solutions/random_solution_dataset_" + std::to_string(dataset) + ".txt", 100);
+    }
+    
 }
