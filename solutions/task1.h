@@ -4,16 +4,24 @@
 #include <numeric>
 #include <utility>
 
-std::pair<int, int> find_nearest_neighbor(int current_node, const std::vector<bool>& visited, int dataset) {
+std::pair<int, int> find_nearest_neighbor(int current_node, const std::vector<bool>& visited, int dataset, int greedy_mode = 0) {
     int nearest_node = -1;
     int nearest_distance = std::numeric_limits<int>::max();
 
     for (int k = 0; k < 200; ++k) {
         if (!visited[k]) {
-            int distance = DISTANCE_MATRIX[current_node][k][dataset] + NODE_COST[k][dataset];
-            if (distance < nearest_distance) {
-                nearest_distance = distance;
-                nearest_node = k;
+            if (greedy_mode == 0) {
+                int distance = DISTANCE_MATRIX[current_node][k][dataset] + NODE_COST[k][dataset];
+                if (distance < nearest_distance) {
+                    nearest_distance = distance;
+                    nearest_node = k;
+                }
+            } else {
+                int distance = 2 * DISTANCE_MATRIX[current_node][k][dataset] + NODE_COST[k][dataset] + NODE_COST[current_node][dataset];
+                if (distance < nearest_distance) {
+                    nearest_distance = distance;
+                    nearest_node = k;
+                }
             }
         }
     }
@@ -140,8 +148,8 @@ void task1_greedy_cycle(ResultManager& result_manager) {
 
         // Pick 2nd node that minimizes distance + node cost
 
-
-        auto [second_node, min_cost] = find_nearest_neighbor(start_node, visited, dataset);
+        int greedy_mode = 1;
+        auto [second_node, min_cost] = find_nearest_neighbor(start_node, visited, dataset, greedy_mode);
         // int min_cost = std::numeric_limits<int>::max();
         // for (int k = 0; k < total_nodes; ++k) {
         //     if (!visited[k]) {

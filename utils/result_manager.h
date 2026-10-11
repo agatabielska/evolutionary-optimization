@@ -21,7 +21,7 @@ public:
 
     void update_best_solution(int new_cost, const int* new_solution, int num_nodes) noexcept {
         if (new_cost < best_cost) {
-            assert(num_nodes <= 200);
+            assert(num_nodes <= 100);
             best_cost = new_cost;
             std::copy_n(new_solution, num_nodes, best_solution);
         }
