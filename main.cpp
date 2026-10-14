@@ -1,6 +1,7 @@
 #include "utils/reader.h"
 #include "utils/result_manager.h"
 #include "solutions/task1.h"
+#include "solutions/task2.h"
 #include <iostream>
 #include <cmath>
 
@@ -33,6 +34,26 @@ int main() {
         greedy_manager.dataset = dataset;
         task1_greedy_cycle(greedy_manager);
         greedy_manager.save_best_solution_to_file("calculated_solutions/greedy_dataset_" + std::to_string(dataset) + ".txt", 100);
+
+        ResultManager task2_nn_regret_manager;
+        task2_nn_regret_manager.dataset = dataset;
+        task2_nn_anywhere_regret(task2_nn_regret_manager);
+        task2_nn_regret_manager.save_best_solution_to_file("calculated_solutions/task2_nn_anywhere_regret_dataset_" + std::to_string(dataset) + ".txt", 100);
+
+        ResultManager task2_nn_weighted_manager;
+        task2_nn_weighted_manager.dataset = dataset;
+        task2_nn_anywhere_weighted(task2_nn_weighted_manager);
+        task2_nn_weighted_manager.save_best_solution_to_file("calculated_solutions/task2_nn_anywhere_weighted_dataset_" + std::to_string(dataset) + ".txt", 100);
+
+        ResultManager task2_cycle_regret_manager;
+        task2_cycle_regret_manager.dataset = dataset;
+        task2_greedy_cycle_regret(task2_cycle_regret_manager);
+        task2_cycle_regret_manager.save_best_solution_to_file("calculated_solutions/task2_greedy_cycle_regret_dataset_" + std::to_string(dataset) + ".txt", 100);
+
+        ResultManager task2_cycle_weighted_manager;
+        task2_cycle_weighted_manager.dataset = dataset;
+        task2_greedy_cycle_weighted(task2_cycle_weighted_manager);
+        task2_cycle_weighted_manager.save_best_solution_to_file("calculated_solutions/task2_greedy_cycle_weighted_dataset_" + std::to_string(dataset) + ".txt", 100);
     }
     
 }
