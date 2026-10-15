@@ -1,5 +1,6 @@
 #include "utils/reader.h"
 #include "utils/result_manager.h"
+#include "utils/plotter.h"
 #include "solutions/task1.h"
 #include <iostream>
 #include <cmath>
@@ -33,6 +34,12 @@ int main() {
         greedy_manager.dataset = dataset;
         task1_greedy_cycle(greedy_manager);
         greedy_manager.save_best_solution_to_file("calculated_solutions/greedy_dataset_" + std::to_string(dataset) + ".txt", 100);
+
+        generate_dataset_plot(dataset, {
+            {"Random", random_result_manager},
+            {"Nearest neighbor (end)", nn_result_manager},
+            {"Nearest neighbor (any position)", nn_anywhere_at_path_result_manager},
+            {"Greedy cycle", greedy_manager},
+        });
     }
-    
 }

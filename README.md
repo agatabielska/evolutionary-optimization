@@ -34,7 +34,8 @@ so you get 200 solutions per method and instance. Random search also makes 200 s
     ├── utils/
     │   ├── reader.h              CSV reader, distance matrix, node costs
     │   ├── euclidean.h           rounded Euclidean distance
-    │   └── result_manager.h      objective evaluation, best/worst/avg, saving results
+    │   ├── result_manager.h      objective evaluation, best/worst/avg, saving results
+    │   └── plotter.h             creates 2D SVG plots after all methods finish
     ├── data/
     │   ├── TSPA.csv              instance A
     │   └── TSPB.csv              instance B
@@ -84,6 +85,13 @@ Expected console output:
     --- Dataset TSPB ---
 
 The program prints only the dataset headers.
+
+After all result files have been saved, the program automatically creates
+`calculated_solutions/TSPA_best_solutions.svg` and
+`calculated_solutions/TSPB_best_solutions.svg`. Each image contains one
+panel per method: all nodes are colored by node cost, while the selected
+100-node cycle is drawn on top. Plot generation happens after the result
+timers are stopped, so it does not contribute to the reported method times.
 
 ## Running on Linux
 

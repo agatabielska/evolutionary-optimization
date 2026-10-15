@@ -10,6 +10,8 @@ inline std::vector<std::string> FILE_PATHS = {"./data/TSPA.csv", "./data/TSPB.cs
 
 inline int DISTANCE_MATRIX[200][200][2];
 inline int NODE_COST[200][2];
+inline int NODE_X[200][2];
+inline int NODE_Y[200][2];
 
 inline void read_distance_matrix() {
     for (int i = 0; i < 200; i++) {
@@ -42,6 +44,8 @@ inline void read_distance_matrix() {
                 continue;
             }
             coordinates.push_back({x1, y1});
+            NODE_X[i][k] = x1;
+            NODE_Y[i][k] = y1;
             NODE_COST[i][k] = cost;
         }
         file.close();
