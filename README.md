@@ -13,7 +13,9 @@ The goal is to select exactly **100 of the 200 nodes** and connect them into a
 
 Two instances are used: `TSPA` and `TSPB`.
 
-## What is implemented (Assignment 1: greedy heuristics)
+## What is implemented
+
+### Assignment 1: greedy heuristics
 
 | Method | Description |
 | --- | --- |
@@ -22,15 +24,55 @@ Two instances are used: `TSPA` and `TSPB`.
 | Nearest neighbor, any position | Same idea, but a new node may be added at the beginning, at the end, or inside the path. The best change of the objective is chosen. |
 | Greedy cycle | Start from a node, add its best neighbour to form a 2-node cycle, then keep inserting the node + position with the smallest increase of the objective. |
 
-Every greedy method is run once from each of the 200 starting nodes,
-so you get 200 solutions per method and instance. Random search also makes 200 solutions.
+### Assignment 2: greedy regret heuristics
+
+Two construction frameworks (the extended nearest neighbor, i.e. a path where
+a node may be inserted at the beginning, at the end or inside, and the greedy
+cycle) are combined with two selection criteria, which gives four methods.
+
+| Method | Framework | Selection criterion |
+| --- | --- | --- |
+| Nearest neighbor (any position) + 2-regret | path | `c2 - c1` |
+| Nearest neighbor (any position) + weighted sum | path | `w1 * (c2 - c1) - w2 * c1` |
+| Greedy cycle + 2-regret | cycle | `c2 - c1` |
+| Greedy cycle + weighted sum | cycle | `w1 * (c2 - c1) - w2 * c1` |
+
+How the regret methods work:
+
+1. In every iteration, for **each unvisited node** the increase of the objective
+   (edge length change + node cost) is computed for **every possible insertion
+   position** of the current partial solution.
+2. For each node, `c1` is the best (smallest) insertion cost, `c2` is the
+   second best one, and `pos1` is the position where `c1` occurs.
+3. Each node gets a score. The node with the **largest score** is chosen and
+   inserted at **its own best position** `pos1`.
+4. Ties are broken by the smaller `c1`, then by the smaller node index.
+
+The criteria:
+
+* **2-regret:** `score = c2 - c1`. A node that would lose a lot if it did not
+  get its best position now is inserted first.
+* **Weighted sum:** `score = w1 * (c2 - c1) - w2 * c1`. It combines the regret
+  with the greedy criterion (the best change of the objective, which should
+  be small, hence the minus). By default `w1 = w2 = 0.5`. Other values can be
+  passed as arguments of the functions, e.g.
+  `task2_greedy_cycle_weighted(result_manager, 0.25, 0.75)`.
+
+Sanity checks for the weighted methods: with `w1 = 0` the criterion reduces to
+pure greedy (it should reproduce the corresponding Assignment 1 results), with
+`w2 = 0` it reduces to pure 2-regret.
+
+Every method (in both assignments) is run once from each of the 200 starting
+nodes, so you get 200 solutions per method and instance. Random search also
+makes 200 solutions.
 
 ## Project layout
 
     .
     ├── main.cpp                  entry point, runs all methods on both instances
     ├── solutions/
-    │   └── task1.h               the four algorithms
+    │   ├── task1.h               Assignment 1: random, nearest neighbor (end of path / any position), greedy cycle
+    │   └── task2.h               Assignment 2: 2-regret and weighted-sum variants of nearest neighbor (any position) and greedy cycle
     ├── utils/
     │   ├── reader.h              CSV reader, distance matrix, node costs
     │   ├── euclidean.h           rounded Euclidean distance
@@ -42,6 +84,22 @@ so you get 200 solutions per method and instance. Random search also makes 200 s
     └── calculated_solutions/     output files end up here
 
 Each data file has 200 lines in the form `x;y;cost`.
+
+## Output
+
+For every method and instance a text file is written to `calculated_solutions/`.
+The file name contains the method and the dataset index (`dataset_0` = TSPA,
+`dataset_1` = TSPB), e.g. `greedy_cycle_regret_dataset_0.txt` or
+`nn_anywhere_weighted_dataset_1.txt`. Each file has the following content:
+
+    Best Cost: ...
+    Worst Cost: ...
+    Average Cost: ...
+    Time: ... ms
+    Best Solution: n1,n2,...,n100
+
+`Best Solution` is the list of the 100 selected nodes in the order of the cycle
+(the last node is connected back to the first one).
 
 ## Requirements
 
@@ -71,8 +129,8 @@ In PowerShell, from the repository root:
 
     g++ -std=c++17 -O2 main.cpp -o evolutionary-optimization.exe
 
-Adding `-O2` is recommended, the nearest neighbor (any position) and greedy
-cycle methods are noticeably faster with optimizations on.
+Adding `-O2` is recommended, the nearest neighbor (any position), greedy
+cycle and regret methods are noticeably faster with optimizations on.
 
 ### 3. Run
 

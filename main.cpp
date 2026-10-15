@@ -2,6 +2,7 @@
 #include "utils/result_manager.h"
 #include "utils/plotter.h"
 #include "solutions/task1.h"
+#include "solutions/task2.h"
 #include <iostream>
 #include <cmath>
 
@@ -41,5 +42,24 @@ int main() {
             {"Nearest neighbor (any position)", nn_anywhere_at_path_result_manager},
             {"Greedy cycle", greedy_manager},
         });
+        ResultManager task2_nn_regret_manager;
+        task2_nn_regret_manager.dataset = dataset;
+        task2_nn_anywhere_regret(task2_nn_regret_manager);
+        task2_nn_regret_manager.save_best_solution_to_file("calculated_solutions/task2_nn_anywhere_regret_dataset_" + std::to_string(dataset) + ".txt", 100);
+
+        ResultManager task2_nn_weighted_manager;
+        task2_nn_weighted_manager.dataset = dataset;
+        task2_nn_anywhere_weighted(task2_nn_weighted_manager);
+        task2_nn_weighted_manager.save_best_solution_to_file("calculated_solutions/task2_nn_anywhere_weighted_dataset_" + std::to_string(dataset) + ".txt", 100);
+
+        ResultManager task2_cycle_regret_manager;
+        task2_cycle_regret_manager.dataset = dataset;
+        task2_greedy_cycle_regret(task2_cycle_regret_manager);
+        task2_cycle_regret_manager.save_best_solution_to_file("calculated_solutions/task2_greedy_cycle_regret_dataset_" + std::to_string(dataset) + ".txt", 100);
+
+        ResultManager task2_cycle_weighted_manager;
+        task2_cycle_weighted_manager.dataset = dataset;
+        task2_greedy_cycle_weighted(task2_cycle_weighted_manager);
+        task2_cycle_weighted_manager.save_best_solution_to_file("calculated_solutions/task2_greedy_cycle_weighted_dataset_" + std::to_string(dataset) + ".txt", 100);
     }
 }
