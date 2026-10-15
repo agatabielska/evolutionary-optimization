@@ -73,7 +73,8 @@ inline void write_plot_panel(std::ofstream& file, const PlotMethod& method,
     }
 }
 
-inline void generate_dataset_plot(int dataset, const std::vector<PlotMethod>& methods) {
+inline void generate_dataset_plot(int dataset, const std::vector<PlotMethod>& methods,
+                                 const std::string& file_suffix = "best_solutions") {
     std::filesystem::create_directories("calculated_solutions");
 
     int min_x = NODE_X[0][dataset], max_x = NODE_X[0][dataset];
@@ -90,9 +91,10 @@ inline void generate_dataset_plot(int dataset, const std::vector<PlotMethod>& me
 
     const int panel_width = 700;
     const int panel_height = 520;
-    std::ofstream file("calculated_solutions/" +
-                       std::string(dataset == 0 ? "TSPA" : "TSPB") +
-                       "_best_solutions.svg");
+    const std::string dataset_name = dataset == 0 ? "TSPA" : "TSPB";
+    const std::string output_path = "calculated_solutions/" + dataset_name +
+                                   "_" + file_suffix + ".svg";
+    std::ofstream file(output_path);
     if (!file.is_open()) {
         std::cerr << "Error opening SVG plot for dataset " << dataset << '\n';
         return;
@@ -108,6 +110,10 @@ inline void generate_dataset_plot(int dataset, const std::vector<PlotMethod>& me
                          max_cost);
     }
     file << "</svg>\n";
-    std::cout << "Saved plot: calculated_solutions/"
-              << (dataset == 0 ? "TSPA" : "TSPB") << "_best_solutions.svg\n";
+    std::cout << "Saved plot: " << output_path << '\n';
+}
+
+inline void generate_task2_dataset_plot(int dataset,
+                                        const std::vector<PlotMethod>& methods) {
+    generate_dataset_plot(dataset, methods, "task2_best_solutions");
 }

@@ -61,5 +61,12 @@ int main() {
         task2_cycle_weighted_manager.dataset = dataset;
         task2_greedy_cycle_weighted(task2_cycle_weighted_manager);
         task2_cycle_weighted_manager.save_best_solution_to_file("calculated_solutions/task2_greedy_cycle_weighted_dataset_" + std::to_string(dataset) + ".txt", 100);
+
+        generate_task2_dataset_plot(dataset, {
+            {"Nearest neighbor (regret)", task2_nn_regret_manager},
+            {"Nearest neighbor (weighted)", task2_nn_weighted_manager},
+            {"Greedy cycle (regret)", task2_cycle_regret_manager},
+            {"Greedy cycle (weighted)", task2_cycle_weighted_manager},
+        });
     }
 }

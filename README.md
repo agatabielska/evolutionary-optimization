@@ -101,9 +101,16 @@ The file name contains the method and the dataset index (`dataset_0` = TSPA,
 `Best Solution` is the list of the 100 selected nodes in the order of the cycle
 (the last node is connected back to the first one).
 
+In addition, an SVG summary is generated for each dataset after all methods are
+processed. The task-1 plot is saved as `TSPA_best_solutions.svg` or
+`TSPB_best_solutions.svg`, and the task-2 plot is saved as
+`TSPA_task2_best_solutions.svg` or `TSPB_task2_best_solutions.svg`.
+Each image contains one panel per method; the chosen 100-node cycle is drawn on
+top of the nodes, which are colored by node cost.
+
 ## Requirements
 
-* A C++17 compiler (g++ is used below)
+* A C++17-compatible compiler (g++ is used below)
 * The program must be started from the **repository root**, because the
   paths `./data/...` and `calculated_solutions/...` are relative.
 
@@ -139,17 +146,18 @@ cycle and regret methods are noticeably faster with optimizations on.
 Expected console output:
 
     --- Dataset TSPA ---
+    Saved plot: calculated_solutions/TSPA_best_solutions.svg
+    Saved plot: calculated_solutions/TSPA_task2_best_solutions.svg
 
     --- Dataset TSPB ---
+    Saved plot: calculated_solutions/TSPB_best_solutions.svg
+    Saved plot: calculated_solutions/TSPB_task2_best_solutions.svg
 
-The program prints only the dataset headers.
+The program prints the dataset headers and the two generated SVG file names for
+each dataset.
 
-After all result files have been saved, the program automatically creates
-`calculated_solutions/TSPA_best_solutions.svg` and
-`calculated_solutions/TSPB_best_solutions.svg`. Each image contains one
-panel per method: all nodes are colored by node cost, while the selected
-100-node cycle is drawn on top. Plot generation happens after the result
-timers are stopped, so it does not contribute to the reported method times.
+Plot generation happens after the result timers are stopped, so it does not
+contribute to the reported method times.
 
 ## Running on Linux
 
@@ -165,10 +173,10 @@ Debian / Ubuntu:
 From the repository root:
 
     mkdir -p calculated_solutions
-    g++ -std=c++17 -O2 main.cpp $(find utils solutions -name '*.cpp') -o evolutionary-optimization
+    g++ -std=c++17 -O2 main.cpp -o evolutionary-optimization
 
-(If there are no `.cpp` files in `utils` and `solutions`, the `find` part
-expands to nothing and the build still works.)
+This project does not require any `.cpp` files from `utils` or `solutions`; all
+logic is included directly from the headers.
 
 ### 3. Run
 
@@ -186,6 +194,11 @@ The `calculated_solutions` folder does not exist. Create it in project root (New
 
 **`g++` is not recognized (Windows)**
 The MinGW `bin` folder is not on your `PATH`. Add it and restart PowerShell.
+
+**Structured binding / `auto [x, y]` errors**
+The installed compiler is too old for C++17. This project uses structured
+bindings in `task1.h`, so install a newer GCC (for example from MSYS2's
+`mingw-w64-ucrt-x86_64-gcc` toolchain) and rebuild with `-std=c++17`.
 
 **Linker error about multiple definitions**
 Functions in the headers are not marked `inline`. This only shows up if a
