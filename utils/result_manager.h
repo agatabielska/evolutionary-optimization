@@ -6,6 +6,7 @@
 #include <iostream>
 #include <chrono>
 #include <cmath>
+#include <vector>
 // #include "reader.h"
 
 class ResultManager {
@@ -18,6 +19,7 @@ public:
     int dataset = 0;
     int best_solution[200]{};
     std::chrono::high_resolution_clock::time_point start_time = std::chrono::high_resolution_clock::now();
+    std::vector<double> run_times_ms;
 
     void update_best_solution(int new_cost, const int* new_solution, int num_nodes) noexcept {
         if (new_cost < best_cost) {
@@ -30,6 +32,10 @@ public:
         }
         ++evaluations_count;
         total_cost += new_cost;
+    }
+
+    void record_run_time(double duration_ms) {
+        run_times_ms.push_back(duration_ms);
     }
 
     void check_solution(const int* new_solution, int num_nodes) noexcept {
@@ -45,7 +51,8 @@ public:
         update_best_solution(new_cost, new_solution, num_nodes);
     }
 
-    void save_best_solution_to_file(const std::string& filename, int num_nodes) const {
+    void save_best_solution_to_file(const std::string& filename, int num_nodes,
+                                    const std::string& title = "") const {
         std::ofstream file(filename);
         if (!file.is_open()) {
             std::cerr << "Error opening file for writing: " << filename << std::endl;
@@ -60,6 +67,9 @@ public:
             ? static_cast<long long>(std::round(total_cost / evaluations_count)) 
             : 0;
 
+        if (!title.empty()) {
+            file << "Method: " << title << std::endl;
+        }
         file << "Best Cost: " << best_cost << std::endl;
         file << "Worst Cost: " << worst_cost << std::endl;
         file << "Average Cost: " << avg_rounded << std::endl;

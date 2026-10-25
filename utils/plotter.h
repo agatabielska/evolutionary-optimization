@@ -100,8 +100,11 @@ inline void generate_dataset_plot(int dataset, const std::vector<PlotMethod>& me
         return;
     }
 
-    file << "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"1400\" height=\"1040\" "
-            "viewBox=\"0 0 1400 1040\">\n";
+    const int columns = 2;
+    const int rows = static_cast<int>((methods.size() + columns - 1) / columns);
+    const int canvas_height = std::max(1, rows) * panel_height;
+    file << "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"1400\" height=\""
+         << canvas_height << "\" viewBox=\"0 0 1400 " << canvas_height << "\">\n";
     file << "<rect width=\"100%\" height=\"100%\" fill=\"#eeeeee\"/>\n";
     for (size_t i = 0; i < methods.size(); ++i) {
         write_plot_panel(file, methods[i], static_cast<int>(i % 2) * panel_width,
@@ -109,6 +112,7 @@ inline void generate_dataset_plot(int dataset, const std::vector<PlotMethod>& me
                          panel_height, min_x, max_x, min_y, max_y, min_cost,
                          max_cost);
     }
+
     file << "</svg>\n";
     std::cout << "Saved plot: " << output_path << '\n';
 }
@@ -116,4 +120,9 @@ inline void generate_dataset_plot(int dataset, const std::vector<PlotMethod>& me
 inline void generate_task2_dataset_plot(int dataset,
                                         const std::vector<PlotMethod>& methods) {
     generate_dataset_plot(dataset, methods, "task2_best_solutions");
+}
+
+inline void generate_local_search_dataset_plot(
+    int dataset, const std::vector<PlotMethod>& methods) {
+    generate_dataset_plot(dataset, methods, "local_search_best_solutions");
 }

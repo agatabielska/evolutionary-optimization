@@ -58,6 +58,33 @@ The criteria:
   passed as arguments of the functions, e.g.
   `task2_greedy_cycle_weighted(result_manager, 0.25, 0.75)`.
 
+### Assignment 3: local search
+
+Local search uses the objective-function delta for every move; it never builds
+a neighbor and reevaluates the complete objective while exploring a
+neighborhood. The implemented variants combine:
+
+* steepest descent or greedy descent;
+* intra-route exchange of two nodes or two edges (2-opt);
+* random or weighted nearest-neighbor starting solutions.
+
+The inter-route neighborhood always exchanges one selected node with one
+unselected node. The steepest version evaluates the complete combined
+neighborhood and applies its best improving move. The greedy version creates
+the complete list of move descriptors, shuffles that list with a
+`std::mt19937` generator seeded from `std::random_device`, and evaluates moves
+in that order until the first improving move is found. Thus inter- and
+intra-route moves are mixed, and the greedy version does not evaluate the
+whole neighborhood before choosing a move.
+
+Each of the eight combinations is run 200 times. Random starts are generated
+by shuffling all 200 nodes and keeping the first 100. Greedy starts use the
+weighted nearest-neighbor construction from Assignment 2, with starting nodes
+0 through 199. The objective and running-time tables are written to
+`calculated_solutions/local_search_report_dataset_0.txt` and
+`calculated_solutions/local_search_report_dataset_1.txt`. Individual local
+search results and best-solution plots are written to the same directory.
+
 Sanity checks for the weighted methods: with `w1 = 0` the criterion reduces to
 pure greedy (it should reproduce the corresponding Assignment 1 results), with
 `w2 = 0` it reduces to pure 2-regret.
