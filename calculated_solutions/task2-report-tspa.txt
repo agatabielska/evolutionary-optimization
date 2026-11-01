@@ -1,0 +1,13 @@
+Objective values (average (minimum - maximum))
+Method                                                                Average (min - max)
+Nearest neighbor (regret)                                             121360.29 (110950 - 135771)
+Nearest neighbor (weighted)                                           74886.02 (72216 - 77631)
+Greedy cycle (regret)                                                 120367.52 (110303 - 128089)
+Greedy cycle (weighted)                                               73349.72 (72280 - 75059)
+
+Running times in milliseconds (average (minimum - maximum))
+Method                                                                Average (min - max)
+Nearest neighbor (regret)                                                1.608 (1.608 - 1.608)
+Nearest neighbor (weighted)                                              1.615 (1.615 - 1.615)
+Greedy cycle (regret)                                                    2.929 (2.929 - 2.929)
+Greedy cycle (weighted)                                                  2.950 (2.950 - 2.950)

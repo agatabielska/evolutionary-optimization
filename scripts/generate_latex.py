@@ -1,56 +1,49 @@
-#!/usr/bin/env python3
-"""Generate copy-ready LaTeX tables and local-search solution sections."""
+"""Generate copy-ready LaTeX tables and solution sections for task 3 and task 4.
+
+Reads the files written by main.cpp (calculated_solutions/task<N>-<kind>-<dataset>-...)
+and writes calculated_solutions/task3-latex.tex and calculated_solutions/task4-latex.tex.
+"""
 
 from __future__ import annotations
 
 import argparse
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
+from typing import NamedTuple
 
+DATASETS = ("TSPA", "TSPB")
+INSTANCE = {"TSPA": "A", "TSPB": "B"}
 
-LOCAL_METHODS = [
-    ("Greedy LS + node exchange + random", "Greedy + node exchange + random start",
-     "greedy", "node_exchange", "random_start"),
-    ("Greedy LS + node exchange + weighted NN", "Greedy + node exchange + weighted NN start",
-     "greedy", "node_exchange", "weighted_nn_start"),
-    ("Greedy LS + edge exchange + random", "Greedy + edge exchange + random start",
-     "greedy", "edge_exchange", "random_start"),
-    ("Greedy LS + edge exchange + weighted NN", "Greedy + edge exchange + weighted NN start",
-     "greedy", "edge_exchange", "weighted_nn_start"),
-    ("Steepest LS + node exchange + random", "Steepest + node exchange + random start",
-     "steepest", "node_exchange", "random_start"),
-    ("Steepest LS + node exchange + weighted NN", "Steepest + node exchange + weighted NN start",
-     "steepest", "node_exchange", "weighted_nn_start"),
-    ("Steepest LS + edge exchange + random", "Steepest + edge exchange + random start",
-     "steepest", "edge_exchange", "random_start"),
-    ("Steepest LS + edge exchange + weighted NN", "Steepest + edge exchange + weighted NN start",
-     "steepest", "edge_exchange", "weighted_nn_start"),
-]
-
+OBJECTIVE_FIELDS = ("average", "minimum", "maximum")
+TIME_FIELDS = ("time_average", "time_minimum", "time_maximum")
 
 @dataclass(frozen=True)
 class Result:
-    average: float
-    minimum: float
-    maximum: float
+    average: float = 0.0
+    minimum: float = 0.0
+    maximum: float = 0.0
     time_average: float | None = None
     time_minimum: float | None = None
     time_maximum: float | None = None
+    evaluated: float | None = None   # task 4: average evaluated moves per run
+    applied: float | None = None     # task 4: average applied moves per run
+    lists_ms: float | None = None    # task 4: one-off time of building candidate lists
     best_solution: str = ""
 
-    def objective_text(self) -> str:
-        return f"{self.average:.2f} ({self.minimum:.0f} -- {self.maximum:.0f})"
 
-    def time_text(self) -> str:
-        if self.time_average is None:
-            return "---"
-        if self.time_minimum is None or self.time_maximum is None:
-            return f"{self.time_average:.3f} (---)"
-        return (
-            f"{self.time_average:.3f} "
-            f"({self.time_minimum:.3f} -- {self.time_maximum:.3f})"
-        )
+class Row(NamedTuple):
+    name: str       # name shown in the table
+    category: str   # rows of the same category are compared for the underline
+    result: Result
+
+def solution_file(results_dir: Path, task: int, dataset: str, description: str) -> Path:
+    return results_dir / f"task{task}-solution-{dataset.lower()}-{description}.txt"
+
+
+def report_file(results_dir: Path, task: int, dataset: str, description: str = "") -> Path:
+    suffix = f"-{description}" if description else ""
+    return results_dir / f"task{task}-report-{dataset.lower()}{suffix}.txt"
 
 
 def read_key_values(path: Path) -> dict[str, str]:
@@ -62,93 +55,136 @@ def read_key_values(path: Path) -> dict[str, str]:
     return values
 
 
-def legacy_result(results_dir: Path, filename: str) -> Result:
-    values = read_key_values(results_dir / filename)
-    return Result(
-        average=float(values["Average Cost"]),
-        minimum=float(values["Best Cost"]),
-        maximum=float(values["Worst Cost"]),
-        time_average=float(values["Time"].removesuffix(" ms")) / 200.0,
-    )
+def parse_number(text: str) -> float | None:
+    return None if text == "-" else float(text)
 
 
-def local_result(results_dir: Path, dataset: str, method: tuple[str, ...]) -> Result:
-    _, _, search, move, start = method
-    filename = f"local_search_{dataset}_{search}_{move}_{start}.txt"
-    values = read_key_values(results_dir / filename)
-    return Result(
-        average=float(values["Average Cost"]),
-        minimum=float(values["Best Cost"]),
-        maximum=float(values["Worst Cost"]),
-        best_solution=values["Best Solution"],
-    )
+REPORT_LINE = re.compile(
+    r"^(.*?)\s+(-?\d+(?:\.\d+)?) \((-?\d+(?:\.\d+)?) - (-?\d+(?:\.\d+)?)\)$"
+)
 
 
-def local_report(results_dir: Path, dataset: str) -> dict[str, Result]:
-    lines = (results_dir / f"local_search_report_{dataset}.txt").read_text().splitlines()
+def read_report(path: Path) -> dict[str, Result]:
+    """Objective and running-time tables written by write_local_search_report."""
     results: dict[str, Result] = {}
-    section = "objective"
-    pattern = re.compile(
-        r"^(.*?)\s+(-?\d+(?:\.\d+)?) \((-?\d+(?:\.\d+)?) - (-?\d+(?:\.\d+)?)\)$"
-    )
-    for line in lines:
+    in_time_section = False
+    for line in path.read_text().splitlines():
         if line.startswith("Running times"):
-            section = "time"
+            in_time_section = True
             continue
-        match = pattern.match(line)
+        match = REPORT_LINE.match(line)
         if not match:
             continue
-        name, average, minimum, maximum = match.groups()
-        name = name.rstrip()
-        result = results.get(name, Result(0, 0, 0))
-        if section == "objective":
-            results[name] = Result(float(average), float(minimum), float(maximum),
-                                   result.time_average, result.time_minimum,
-                                   result.time_maximum, result.best_solution)
+        name = match.group(1).rstrip()
+        average, minimum, maximum = (float(value) for value in match.groups()[1:])
+        current = results.get(name, Result())
+        if in_time_section:
+            results[name] = replace(current, time_average=average,
+                                    time_minimum=minimum, time_maximum=maximum)
         else:
-            results[name] = Result(result.average, result.minimum, result.maximum,
-                                   float(average), float(minimum), float(maximum),
-                                   result.best_solution)
+            results[name] = replace(current, average=average,
+                                    minimum=minimum, maximum=maximum)
     return results
 
 
-def all_results(results_dir: Path, dataset: str) -> list[tuple[str, str, Result, str]]:
-    legacy = [
-        ("Random solution", "assignment1", "random_solution_dataset_{i}.txt"),
-        ("Nearest neighbor (end)", "assignment1", "nn_solution_dataset_{i}.txt"),
-        ("Nearest neighbor (all positions)", "assignment1",
-         "nn_anywhere_at_path_solution_dataset_{i}.txt"),
-        ("Greedy cycle", "assignment1", "greedy_dataset_{i}.txt"),
-        ("NN + 2-regret", "assignment2", "nn_anywhere_regret_dataset_{i}.txt"),
-        ("NN + weighted sum", "assignment2", "nn_anywhere_weighted_dataset_{i}.txt"),
-        ("GC + 2-regret", "assignment2", "greedy_cycle_regret_dataset_{i}.txt"),
-        ("GC + weighted sum", "assignment2", "greedy_cycle_weighted_dataset_{i}.txt"),
-    ]
-    index = 0 if dataset == "TSPA" else 1
-    rows = [
-        (name, category, legacy_result(results_dir, filename.format(i=index)), "legacy")
-        for name, category, filename in legacy
-    ]
-    report = local_report(results_dir, dataset)
-    for short_name, report_name, *_ in LOCAL_METHODS:
-        reported = report[report_name]
-        stored = local_result(results_dir, dataset, next(
-            method for method in LOCAL_METHODS if method[0] == short_name
-        ))
-        rows.append((
-            short_name,
-            "local_search",
-            Result(
-                reported.average,
-                reported.minimum,
-                reported.maximum,
-                reported.time_average,
-                reported.time_minimum,
-                reported.time_maximum,
-                stored.best_solution,
-            ),
-            "local",
-        ))
+MOVES_LINE = re.compile(r"^(.*?)\s+(-|[\d.]+)\s+(-|[\d.]+)\s+(-|[\d.]+)$")
+
+
+def read_moves(path: Path) -> dict[str, Result]:
+    """Evaluated / applied moves table written by write_task4_stats."""
+    results: dict[str, Result] = {}
+    for line in path.read_text().splitlines():
+        match = MOVES_LINE.match(line)
+        if not match or match.group(1).strip() == "Method":
+            continue
+        evaluated, applied, lists_ms = (parse_number(value) for value in match.groups()[1:])
+        results[match.group(1).rstrip()] = Result(
+            evaluated=evaluated, applied=applied, lists_ms=lists_ms)
+    return results
+
+
+def best_solution(results_dir: Path, task: int, dataset: str, description: str) -> str:
+    return read_key_values(solution_file(results_dir, task, dataset, description))["Best Solution"]
+
+# (table name, category, task, description of the solution file)
+EARLIER_METHODS = [
+    ("Random solution", "assignment1", 1, "random"),
+    ("Nearest neighbor (end)", "assignment1", 1, "nn-end"),
+    ("Nearest neighbor (all positions)", "assignment1", 1, "nn-any"),
+    ("Greedy cycle", "assignment1", 1, "greedy-cycle"),
+    ("NN + 2-regret", "assignment2", 2, "nn-regret"),
+    ("NN + weighted sum", "assignment2", 2, "nn-weighted"),
+    ("GC + 2-regret", "assignment2", 2, "cycle-regret"),
+    ("GC + weighted sum", "assignment2", 2, "cycle-weighted"),
+]
+
+# (table name, name in the task 3 report, description of the solution file)
+LOCAL_METHODS = [
+    ("Greedy LS + node exchange + random", "Greedy + node exchange + random start",
+     "greedy-node-random-start"),
+    ("Greedy LS + node exchange + weighted NN", "Greedy + node exchange + weighted NN start",
+     "greedy-node-greedy-start"),
+    ("Greedy LS + edge exchange + random", "Greedy + edge exchange + random start",
+     "greedy-edge-random-start"),
+    ("Greedy LS + edge exchange + weighted NN", "Greedy + edge exchange + weighted NN start",
+     "greedy-edge-greedy-start"),
+    ("Steepest LS + node exchange + random", "Steepest + node exchange + random start",
+     "steepest-node-random-start"),
+    ("Steepest LS + node exchange + weighted NN", "Steepest + node exchange + weighted NN start",
+     "steepest-node-greedy-start"),
+    ("Steepest LS + edge exchange + random", "Steepest + edge exchange + random start",
+     "steepest-edge-random-start"),
+    ("Steepest LS + edge exchange + weighted NN", "Steepest + edge exchange + weighted NN start",
+     "steepest-edge-greedy-start"),
+]
+
+CANDIDATE_COUNTS = (5, 10, 15, 20)
+
+# (table name, category, name in the task 4 report, description of the solution file)
+TASK4_METHODS = [
+    ("Steepest LS (baseline)", "baseline",
+     "Steepest + edge exchange + random start (baseline)", "steepest-baseline"),
+] + [
+    (f"Steepest LS + candidate moves ($k = {k}$)", "candidates",
+     f"Steepest + candidate moves (k = {k}) + random start", f"steepest-candidates-k{k}")
+    for k in CANDIDATE_COUNTS
+]
+
+
+def earlier_rows(results_dir: Path, dataset: str) -> list[Row]:
+    rows = []
+    for name, category, task, description in EARLIER_METHODS:
+        values = read_key_values(solution_file(results_dir, task, dataset, description))
+        rows.append(Row(name, category, Result(
+            average=float(values["Average Cost"]),
+            minimum=float(values["Best Cost"]),
+            maximum=float(values["Worst Cost"]),
+            # these files store the total time of all 200 runs
+            time_average=float(values["Time"].removesuffix(" ms")) / 200.0,
+        )))
+    return rows
+
+
+def task3_rows(results_dir: Path, dataset: str) -> list[Row]:
+    report = read_report(report_file(results_dir, 3, dataset))
+    rows = earlier_rows(results_dir, dataset)
+    for name, report_name, description in LOCAL_METHODS:
+        rows.append(Row(name, "local_search", replace(
+            report[report_name],
+            best_solution=best_solution(results_dir, 3, dataset, description))))
+    return rows
+
+
+def task4_rows(results_dir: Path, dataset: str) -> list[Row]:
+    report = read_report(report_file(results_dir, 4, dataset))
+    moves = read_moves(report_file(results_dir, 4, dataset, "moves"))
+    rows = []
+    for name, category, report_name, description in TASK4_METHODS:
+        counted = moves[report_name]
+        rows.append(Row(name, category, replace(
+            report[report_name],
+            evaluated=counted.evaluated, applied=counted.applied, lists_ms=counted.lists_ms,
+            best_solution=best_solution(results_dir, 4, dataset, description))))
     return rows
 
 
@@ -162,155 +198,192 @@ def decorate(value: str, bold: bool, underline: bool) -> str:
     return value
 
 
-def metric_text(value: float, all_values: list[float],
-                category_values: list[float], decimals: int) -> str:
-    format_string = f"{{:.{decimals}f}}"
-    return decorate(
-        format_string.format(value),
-        value == min(all_values),
-        value == min(category_values),
-    )
+def highlighted(rows: list[Row], index: int, field: str, decimals: int,
+                use_categories: bool) -> str:
+    """Value of one field; the best overall is bold, the best in its category underlined."""
+    value = getattr(rows[index].result, field)
+    category = rows[index].category
+    overall = [v for row in rows if (v := getattr(row.result, field)) is not None]
+    in_category = [v for row in rows
+                   if row.category == category and (v := getattr(row.result, field)) is not None]
+    return decorate(f"{value:.{decimals}f}", value == min(overall),
+                    use_categories and value == min(in_category))
 
 
-def table_cell(rows: list[tuple[str, str, Result, str]], row: int,
-               dataset: str) -> str:
-    result = rows[row][2]
-    category = rows[row][1]
-    category_rows = [item for item in rows if item[1] == category]
-    average = metric_text(
-        result.average,
-        [item[2].average for item in rows],
-        [item[2].average for item in category_rows],
-        0,
-    )
-    minimum = metric_text(
-        result.minimum,
-        [item[2].minimum for item in rows],
-        [item[2].minimum for item in category_rows],
-        0,
-    )
-    maximum = metric_text(
-        result.maximum,
-        [item[2].maximum for item in rows],
-        [item[2].maximum for item in category_rows],
-        0,
-    )
-    return f"{average} ({minimum} -- {maximum})"
-
-
-def time_cell(rows: list[tuple[str, str, Result, str]], row: int) -> str:
-    result = rows[row][2]
-    if result.time_average is None:
+def triple_cell(rows: list[Row], index: int, fields: tuple[str, str, str],
+                decimals: int, use_categories: bool) -> str:
+    """'average (min -- max)' with independent highlighting of the three numbers."""
+    result = rows[index].result
+    average_field, minimum_field, maximum_field = fields
+    if getattr(result, average_field) is None:
         return "---"
-    category = rows[row][1]
-    category_rows = [item for item in rows if item[1] == category]
-    average = metric_text(
-        result.time_average,
-        [item[2].time_average for item in rows
-         if item[2].time_average is not None],
-        [item[2].time_average for item in category_rows
-         if item[2].time_average is not None],
-        3,
-    )
-    if result.time_minimum is None or result.time_maximum is None:
+    average = highlighted(rows, index, average_field, decimals, use_categories)
+    if getattr(result, minimum_field) is None or getattr(result, maximum_field) is None:
         return f"{average} (---)"
-
-    minimum = metric_text(
-        result.time_minimum,
-        [item[2].time_minimum for item in rows
-         if item[2].time_minimum is not None],
-        [item[2].time_minimum for item in category_rows
-         if item[2].time_minimum is not None],
-        3,
-    )
-    maximum = metric_text(
-        result.time_maximum,
-        [item[2].time_maximum for item in rows
-         if item[2].time_maximum is not None],
-        [item[2].time_maximum for item in category_rows
-         if item[2].time_maximum is not None],
-        3,
-    )
+    minimum = highlighted(rows, index, minimum_field, decimals, use_categories)
+    maximum = highlighted(rows, index, maximum_field, decimals, use_categories)
     return f"{average} ({minimum} -- {maximum})"
 
 
-def objective_table(tspa: list[tuple[str, str, Result, str]],
-                    tspb: list[tuple[str, str, Result, str]]) -> str:
+def table_lines(caption: str, label: str, column_spec: str, header: str,
+                body: list[str]) -> str:
     lines = [
         r"\begin{table}[h!]", r"\centering", r"\footnotesize",
         r"\setlength{\tabcolsep}{3pt}", r"\renewcommand{\arraystretch}{1.5}",
-        r"\caption{Objective function values reported as \texttt{average (min -- max)} across 200 runs for Instance A and Instance B. Each average, minimum, and maximum is highlighted independently: the best overall value is bold and the best value within a method category is underlined. NN = nearest neighbor (all positions), GC = greedy cycle, LS = local search.}",
-        r"\label{tab:obj_results}", r"\vspace{0.5em}",
-        r"\begin{tabularx}{\textwidth}{p{7.2cm} X X}", r"\toprule",
-        r"\textbf{Method} & \textbf{Instance A: av (min -- max)} & \textbf{Instance B: av (min -- max)} \\",
-        r"\midrule",
+        rf"\caption{{{caption}}}", rf"\label{{{label}}}", r"\vspace{0.5em}",
+        rf"\begin{{tabularx}}{{\textwidth}}{{{column_spec}}}", r"\toprule",
+        header, r"\midrule",
+        *body,
+        r"\bottomrule", r"\end{tabularx}", r"\end{table}",
     ]
-    for index, (name, category, *_rest) in enumerate(tspa):
-        if index in (4, 8):
-            lines.append(r"\cmidrule{1-3}")
-        lines.append(
-            f"{name} & {table_cell(tspa, index, 'TSPA')} & "
-            f"{table_cell(tspb, index, 'TSPB')} \\\\"
-        )
-    lines += [r"\bottomrule", r"\end{tabularx}", r"\end{table}"]
     return "\n".join(lines)
 
 
-def time_table(tspa: list[tuple[str, str, Result, str]],
-               tspb: list[tuple[str, str, Result, str]]) -> str:
-    lines = [
-        r"\begin{table}[h!]", r"\centering", r"\footnotesize",
-        r"\setlength{\tabcolsep}{3pt}", r"\renewcommand{\arraystretch}{1.5}",
-        r"\caption{Running times in milliseconds reported as \texttt{average (min -- max)} per single run across 200 runs for Instance A and Instance B. Each available average, minimum, and maximum is highlighted independently: the best overall value is bold and the best value within a method category is underlined.}",
-        r"\label{tab:time_results}", r"\vspace{0.5em}",
-        r"\begin{tabularx}{\textwidth}{p{7.2cm} X X}", r"\toprule",
-        r"\textbf{Method} & \textbf{Instance A [ms]: av (min -- max)} & \textbf{Instance B [ms]: av (min -- max)} \\",
-        r"\midrule",
-    ]
-    for index, (name, *_rest) in enumerate(tspa):
-        if index in (4, 8):
-            lines.append(r"\cmidrule{1-3}")
-        lines.append(
-            f"{name} & {time_cell(tspa, index)} & {time_cell(tspb, index)} \\\\"
+def metric_table(rows_a: list[Row], rows_b: list[Row], *, fields: tuple[str, str, str],
+                 decimals: int, caption: str, label: str, header: str,
+                 separators: tuple[int, ...], use_categories: bool) -> str:
+    body = []
+    for index, row in enumerate(rows_a):
+        if index in separators:
+            body.append(r"\cmidrule{1-3}")
+        body.append(
+            f"{row.name} & {triple_cell(rows_a, index, fields, decimals, use_categories)} & "
+            f"{triple_cell(rows_b, index, fields, decimals, use_categories)} \\\\"
         )
-    lines += [r"\bottomrule", r"\end{tabularx}", r"\end{table}"]
-    return "\n".join(lines)
+    return table_lines(caption, label, r"p{7.2cm} X X", header, body)
 
 
-def solution_sections(results_dir: Path, dataset: str) -> str:
-    rows = all_results(results_dir, dataset)
-    local_rows = [row for row in rows if row[3] == "local"]
-    lines = [rf"\subsection{{Instance {'A' if dataset == 'TSPA' else 'B'}}}",
+def moves_cell(rows: list[Row], index: int, field: str, best_is_bold: bool) -> str:
+    value = getattr(rows[index].result, field)
+    if value is None:
+        return "---"
+    if not best_is_bold:
+        return f"{value:.0f}"
+    return highlighted(rows, index, field, 0, use_categories=False)
+
+
+def moves_table(rows_a: list[Row], rows_b: list[Row], caption: str, label: str) -> str:
+    header = (
+        r"\textbf{Method} & \textbf{A: evaluated} & \textbf{A: applied} & "
+        r"\textbf{B: evaluated} & \textbf{B: applied} \\"
+    )
+    body = []
+    for index, row in enumerate(rows_a):
+        if index == 1:
+            body.append(r"\cmidrule{1-5}")
+        body.append(
+            f"{row.name} & {moves_cell(rows_a, index, 'evaluated', True)} & "
+            f"{moves_cell(rows_a, index, 'applied', False)} & "
+            f"{moves_cell(rows_b, index, 'evaluated', True)} & "
+            f"{moves_cell(rows_b, index, 'applied', False)} \\\\"
+        )
+    return table_lines(caption, label, r"p{7.2cm} X X X X", header, body)
+
+
+def solution_section(dataset: str, rows: list[Row]) -> str:
+    lines = [rf"\subsection{{Instance {INSTANCE[dataset]}}}",
              r"\begin{itemize}[leftmargin=1.5em]"]
-    for _, report_name, search, move, start in LOCAL_METHODS:
-        result = next(row[2] for row in local_rows if row[0] == _)
-        title = report_name
+    for row in rows:
         lines += [
-            rf"    \item \textbf{{{title}}} (Obj: \texttt{{{result.minimum:.0f}}}):\\",
-            rf"    \texttt{{{result.best_solution}}}",
+            rf"    \item \textbf{{{row.name}}} (Obj: \texttt{{{row.result.minimum:.0f}}}):\\",
+            rf"    \texttt{{{row.result.best_solution}}}",
         ]
-    lines += [r"\end{itemize}"]
+    lines.append(r"\end{itemize}")
     return "\n".join(lines)
+
+
+# --------------------------------------------------------------------------------------
+# Whole documents
+# --------------------------------------------------------------------------------------
+
+def task3_latex(results_dir: Path) -> str:
+    tspa, tspb = (task3_rows(results_dir, dataset) for dataset in DATASETS)
+    separators = (4, 8)  # after assignment 1 and after assignment 2
+    objective = metric_table(
+        tspa, tspb, fields=OBJECTIVE_FIELDS, decimals=0, separators=separators,
+        use_categories=True, label="tab:obj_results",
+        header=(r"\textbf{Method} & \textbf{Instance A: av (min -- max)} & "
+                r"\textbf{Instance B: av (min -- max)} \\"),
+        caption=(r"Objective function values reported as \texttt{average (min -- max)} across "
+                 r"200 runs for Instance A and Instance B. Each average, minimum, and maximum is "
+                 r"highlighted independently: the best overall value is bold and the best value "
+                 r"within a method category is underlined. NN = nearest neighbor (all positions), "
+                 r"GC = greedy cycle, LS = local search."))
+    running_time = metric_table(
+        tspa, tspb, fields=TIME_FIELDS, decimals=3, separators=separators,
+        use_categories=True, label="tab:time_results",
+        header=(r"\textbf{Method} & \textbf{Instance A [ms]: av (min -- max)} & "
+                r"\textbf{Instance B [ms]: av (min -- max)} \\"),
+        caption=(r"Running times in milliseconds reported as \texttt{average (min -- max)} per "
+                 r"single run across 200 runs for Instance A and Instance B. Each available "
+                 r"average, minimum, and maximum is highlighted independently: the best overall "
+                 r"value is bold and the best value within a method category is underlined."))
+    local_only = lambda rows: [row for row in rows if row.category == "local_search"]
+    return "\n\n".join([
+        objective, running_time,
+        solution_section("TSPA", local_only(tspa)),
+        solution_section("TSPB", local_only(tspb)),
+    ]) + "\n"
+
+
+def task4_latex(results_dir: Path) -> str:
+    tspa, tspb = (task4_rows(results_dir, dataset) for dataset in DATASETS)
+    separators = (1,)  # after the baseline
+    objective = metric_table(
+        tspa, tspb, fields=OBJECTIVE_FIELDS, decimals=0, separators=separators,
+        use_categories=False, label="tab:task4_obj",
+        header=(r"\textbf{Method} & \textbf{Instance A: av (min -- max)} & "
+                r"\textbf{Instance B: av (min -- max)} \\"),
+        caption=(r"Objective function values reported as \texttt{average (min -- max)} across "
+                 r"200 runs from the same random starting solutions. The best value of each "
+                 r"average, minimum, and maximum is bold. $k$ = number of candidate edges per "
+                 r"node."))
+    running_time = metric_table(
+        tspa, tspb, fields=TIME_FIELDS, decimals=3, separators=separators,
+        use_categories=False, label="tab:task4_time",
+        header=(r"\textbf{Method} & \textbf{Instance A [ms]: av (min -- max)} & "
+                r"\textbf{Instance B [ms]: av (min -- max)} \\"),
+        caption=(r"Running times in milliseconds reported as \texttt{average (min -- max)} per "
+                 r"single run across 200 runs. The best value of each average, minimum, and "
+                 r"maximum is bold. Building the candidate lists is a one-off cost of at most "
+                 f"{longest_list_time(tspa + tspb):.2f} ms per instance and is not included."))
+    moves = moves_table(
+        tspa, tspb, label="tab:task4_moves",
+        caption=(r"Average number of evaluated and applied moves per run (200 runs). The "
+                 r"baseline evaluates the whole neighborhood in every iteration; the candidate "
+                 r"variants evaluate only moves that introduce a candidate edge."))
+    return "\n\n".join([
+        objective, running_time, moves,
+        solution_section("TSPA", tspa),
+        solution_section("TSPB", tspb),
+    ]) + "\n"
+
+
+def longest_list_time(rows: list[Row]) -> float:
+    return max((row.result.lists_ms for row in rows if row.result.lists_ms is not None),
+               default=0.0)
+
+
+GENERATORS = {"3": task3_latex, "4": task4_latex}
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--results-dir", type=Path, default=Path("calculated_solutions"))
-    parser.add_argument("--output", type=Path,
-                        default=Path("calculated_solutions/local_search_latex.tex"))
+    parser.add_argument("--task", choices=["3", "4", "all"], default="all")
     args = parser.parse_args()
 
-    tspa = all_results(args.results_dir, "TSPA")
-    tspb = all_results(args.results_dir, "TSPB")
-    output = "\n\n".join([
-        objective_table(tspa, tspb),
-        time_table(tspa, tspb),
-        solution_sections(args.results_dir, "TSPA"),
-        solution_sections(args.results_dir, "TSPB"),
-    ]) + "\n"
-    args.output.write_text(output)
-    print(output, end="")
-    print(f"\nWrote LaTeX to {args.output}", flush=True)
+    tasks = list(GENERATORS) if args.task == "all" else [args.task]
+    for task in tasks:
+        try:
+            output = GENERATORS[task](args.results_dir)
+        except (FileNotFoundError, KeyError) as error:
+            print(f"Task {task}: skipped, missing input ({error})")
+            continue
+        path = args.results_dir / f"task{task}-latex.tex"
+        path.write_text(output)
+        print(output, end="")
+        print(f"\nWrote LaTeX to {path}\n", flush=True)
 
 
 if __name__ == "__main__":

@@ -331,6 +331,9 @@ inline std::string local_search_method_name(bool steepest, bool use_edges,
            (greedy_start ? "weighted NN start" : "random start");
 }
 
+// width of the method-name column in the report tables (must fit the longest method name)
+constexpr int kNameColumn = 70;
+
 inline void write_local_search_report(
     const std::string& filename,
     const std::vector<std::pair<std::string, const ResultManager*>>& methods) {
@@ -341,20 +344,20 @@ inline void write_local_search_report(
     }
 
     file << "Objective values (average (minimum - maximum))\n";
-    file << std::left << std::setw(48) << "Method" << std::right
+    file << std::left << std::setw(kNameColumn) << "Method" << std::right
          << std::setw(18) << "Average (min - max)" << '\n';
     for (const auto& [name, result] : methods) {
         double average = result->evaluations_count == 0
                              ? 0.0
                              : static_cast<double>(result->total_cost) /
                                    result->evaluations_count;
-        file << std::left << std::setw(48) << name << std::right << std::fixed
+        file << std::left << std::setw(kNameColumn) << name << std::right << std::fixed
              << std::setprecision(2) << std::setw(8) << average << " ("
              << result->best_cost << " - " << result->worst_cost << ")\n";
     }
 
     file << "\nRunning times in milliseconds (average (minimum - maximum))\n";
-    file << std::left << std::setw(48) << "Method" << std::right
+    file << std::left << std::setw(kNameColumn) << "Method" << std::right
          << std::setw(18) << "Average (min - max)" << '\n';
     for (const auto& [name, result] : methods) {
         double average = 0.0;
@@ -369,7 +372,7 @@ inline void write_local_search_report(
             minimum = *min_it;
             maximum = *max_it;
         }
-        file << std::left << std::setw(48) << name << std::right << std::fixed
+        file << std::left << std::setw(kNameColumn) << name << std::right << std::fixed
              << std::setprecision(3) << std::setw(8) << average << " ("
              << minimum << " - " << maximum << ")\n";
     }

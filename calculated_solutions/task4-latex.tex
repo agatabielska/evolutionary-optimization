@@ -1,0 +1,93 @@
+\begin{table}[h!]
+\centering
+\footnotesize
+\setlength{\tabcolsep}{3pt}
+\renewcommand{\arraystretch}{1.5}
+\caption{Objective function values reported as \texttt{average (min -- max)} across 200 runs from the same random starting solutions. The best value of each average, minimum, and maximum is bold. $k$ = number of candidate edges per node.}
+\label{tab:task4_obj}
+\vspace{0.5em}
+\begin{tabularx}{\textwidth}{p{7.2cm} X X}
+\toprule
+\textbf{Method} & \textbf{Instance A: av (min -- max)} & \textbf{Instance B: av (min -- max)} \\
+\midrule
+Steepest LS (baseline) & \textbf{76161} (\textbf{73729} -- \textbf{79423}) & 52678 (50220 -- 56889) \\
+\cmidrule{1-3}
+Steepest LS + candidate moves ($k = 5$) & 86374 (80916 -- 93538) & 53996 (51647 -- 57460) \\
+Steepest LS + candidate moves ($k = 10$) & 80335 (76435 -- 86094) & 52705 (\textbf{50082} -- \textbf{55489}) \\
+Steepest LS + candidate moves ($k = 15$) & 77591 (74650 -- 83211) & \textbf{52556} (50815 -- 56474) \\
+Steepest LS + candidate moves ($k = 20$) & 76489 (74228 -- 83753) & 52580 (50330 -- 55956) \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\begin{table}[h!]
+\centering
+\footnotesize
+\setlength{\tabcolsep}{3pt}
+\renewcommand{\arraystretch}{1.5}
+\caption{Running times in milliseconds reported as \texttt{average (min -- max)} per single run across 200 runs. The best value of each average, minimum, and maximum is bold. Building the candidate lists is a one-off cost of at most 0.64 ms per instance and is not included.}
+\label{tab:task4_time}
+\vspace{0.5em}
+\begin{tabularx}{\textwidth}{p{7.2cm} X X}
+\toprule
+\textbf{Method} & \textbf{Instance A [ms]: av (min -- max)} & \textbf{Instance B [ms]: av (min -- max)} \\
+\midrule
+Steepest LS (baseline) & 15.637 (11.986 -- 32.547) & 15.784 (13.382 -- 26.384) \\
+\cmidrule{1-3}
+Steepest LS + candidate moves ($k = 5$) & \textbf{0.618} (\textbf{0.530} -- \textbf{1.184}) & \textbf{0.644} (\textbf{0.540} -- \textbf{0.975}) \\
+Steepest LS + candidate moves ($k = 10$) & 1.295 (1.071 -- 2.268) & 1.314 (1.094 -- 2.040) \\
+Steepest LS + candidate moves ($k = 15$) & 1.909 (1.605 -- 2.466) & 2.056 (1.653 -- 3.799) \\
+Steepest LS + candidate moves ($k = 20$) & 2.624 (2.207 -- 3.288) & 2.711 (2.317 -- 4.205) \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\begin{table}[h!]
+\centering
+\footnotesize
+\setlength{\tabcolsep}{3pt}
+\renewcommand{\arraystretch}{1.5}
+\caption{Average number of evaluated and applied moves per run (200 runs). The baseline evaluates the whole neighborhood in every iteration; the candidate variants evaluate only moves that introduce a candidate edge.}
+\label{tab:task4_moves}
+\vspace{0.5em}
+\begin{tabularx}{\textwidth}{p{7.2cm} X X X X}
+\toprule
+\textbf{Method} & \textbf{A: evaluated} & \textbf{A: applied} & \textbf{B: evaluated} & \textbf{B: applied} \\
+\midrule
+Steepest LS (baseline) & 1991385 & 133 & 1988564 & 133 \\
+\cmidrule{1-5}
+Steepest LS + candidate moves ($k = 5$) & \textbf{102964} & 120 & \textbf{104398} & 127 \\
+Steepest LS + candidate moves ($k = 10$) & 226773 & 125 & 234172 & 132 \\
+Steepest LS + candidate moves ($k = 15$) & 358212 & 129 & 366444 & 133 \\
+Steepest LS + candidate moves ($k = 20$) & 494207 & 131 & 498475 & 133 \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\subsection{Instance A}
+\begin{itemize}[leftmargin=1.5em]
+    \item \textbf{Steepest LS (baseline)} (Obj: \texttt{73729}):\\
+    \texttt{53,140,144,67,16,51,139,112,71,157,91,80,48,31,60,116,149,63,168,11,49,108,152,100,123,160,83,90,132,76,4,35,156,28,180,30,161,97,95,127,69,129,104,92,171,2,189,187,141,87,185,45,73,135,84,58,158,134,176,174,150,106,113,89,42,151,138,182,57,107,88,78,193,153,170,159,130,47,147,101,29,163,136,184,178,1,169,3,50,93,85,164,9,54,33,131,36,177,52,179}
+    \item \textbf{Steepest LS + candidate moves ($k = 5$)} (Obj: \texttt{80916}):\\
+    \texttt{49,123,132,76,4,44,100,152,108,60,31,48,80,91,157,71,112,51,16,35,67,144,179,53,140,41,58,84,36,177,52,33,54,9,143,62,186,136,164,1,59,46,178,29,17,21,147,47,50,3,85,142,8,174,81,93,130,159,170,153,193,78,88,107,89,113,43,106,150,176,72,134,182,57,111,158,192,181,118,114,135,45,70,87,180,145,141,30,187,2,171,104,129,69,127,97,168,116,149,63}
+    \item \textbf{Steepest LS + candidate moves ($k = 10$)} (Obj: \texttt{76435}):\\
+    \texttt{108,31,48,80,91,132,76,71,157,115,112,139,51,16,35,185,67,144,140,53,179,52,143,33,9,54,131,36,177,84,134,176,174,8,164,136,184,178,29,55,101,147,47,1,169,3,50,93,81,106,150,151,89,130,159,146,170,75,26,78,193,153,88,122,107,57,182,158,192,20,58,135,61,73,45,87,180,141,189,187,30,161,2,171,92,104,129,69,127,95,97,83,123,152,49,168,63,149,116,60}
+    \item \textbf{Steepest LS + candidate moves ($k = 15$)} (Obj: \texttt{74650}):\\
+    \texttt{112,51,16,67,45,185,35,180,28,102,87,141,187,30,160,83,123,132,76,4,71,157,91,80,48,31,60,108,152,49,63,149,116,168,97,171,2,189,10,98,25,114,181,135,73,140,53,144,52,179,177,36,131,33,9,54,8,142,164,85,174,176,150,106,43,113,89,42,151,134,84,58,192,158,111,138,182,57,107,88,78,153,170,146,159,130,47,93,50,3,169,1,101,29,178,184,136,186,154,115}
+    \item \textbf{Steepest LS + candidate moves ($k = 20$)} (Obj: \texttt{74228}):\\
+    \texttt{50,3,169,1,85,174,176,151,42,89,150,106,113,107,130,159,170,153,78,88,57,182,192,158,134,84,58,181,114,135,73,45,87,141,30,161,187,189,2,171,92,69,127,97,168,63,149,116,60,49,152,108,31,7,48,80,38,91,157,71,4,76,132,90,123,83,180,28,102,185,35,51,115,112,139,16,67,144,140,53,179,52,177,36,131,33,9,54,8,142,164,186,136,178,29,101,147,37,47,93}
+\end{itemize}
+
+\subsection{Instance B}
+\begin{itemize}[leftmargin=1.5em]
+    \item \textbf{Steepest LS (baseline)} (Obj: \texttt{50220}):\\
+    \texttt{85,51,167,73,59,151,122,173,3,184,46,72,120,8,133,136,172,160,69,183,130,30,21,38,47,140,154,97,155,71,141,40,60,157,45,134,175,132,29,6,115,170,125,177,158,145,28,149,13,146,37,116,147,121,198,96,48,156,89,57,185,104,190,70,187,81,94,105,61,196,114,10,127,80,129,90,153,110,2,14,20,74,171,99,163,31,67,66,192,54,162,76,135,27,24,34,152,181,179,87}
+    \item \textbf{Steepest LS + candidate moves ($k = 5$)} (Obj: \texttt{51647}):\\
+    \texttt{14,20,74,153,52,90,129,127,80,67,24,34,181,179,87,82,167,51,85,59,40,141,71,60,157,45,134,175,197,6,29,132,103,178,65,177,125,170,115,97,26,154,140,47,38,21,30,191,130,158,145,28,149,146,37,116,147,42,121,198,96,48,89,57,185,46,72,117,120,133,136,172,160,69,122,184,3,151,111,22,27,76,162,192,54,187,81,94,105,61,139,196,114,10,143,56,118,110,2,188}
+    \item \textbf{Steepest LS + candidate moves ($k = 10$)} (Obj: \texttt{50082}):\\
+    \texttt{152,34,24,67,99,171,74,20,2,14,153,90,129,127,10,148,114,196,139,61,105,94,81,70,187,54,192,162,104,76,185,57,89,48,96,198,121,42,147,116,37,146,149,28,145,158,177,125,170,115,6,29,132,197,175,134,45,157,60,40,141,71,155,97,154,140,33,49,64,47,38,21,30,183,69,160,172,136,133,120,8,117,72,46,86,27,3,184,122,151,98,167,73,59,85,51,82,87,179,181}
+    \item \textbf{Steepest LS + candidate moves ($k = 15$)} (Obj: \texttt{50815}):\\
+    \texttt{177,125,170,115,6,29,132,197,175,134,45,60,71,155,40,154,140,47,38,191,130,30,183,21,189,69,160,172,136,133,120,117,184,3,173,122,151,98,64,85,59,73,167,51,82,87,179,181,152,34,24,66,67,99,171,74,20,2,14,153,182,80,127,129,90,143,148,61,105,94,81,190,70,187,196,114,10,54,192,162,76,86,46,72,57,89,156,43,48,96,198,121,147,116,37,149,28,145,65,158}
+    \item \textbf{Steepest LS + candidate moves ($k = 20$)} (Obj: \texttt{50330}):\\
+    \texttt{60,40,71,155,115,170,177,125,26,154,140,47,38,21,176,30,183,189,133,120,117,8,136,172,160,69,151,184,3,135,76,185,104,144,162,192,84,119,66,67,31,24,34,152,181,167,73,59,85,51,179,87,99,171,17,2,14,20,74,153,182,52,90,129,127,80,54,10,114,196,61,105,94,81,187,70,190,57,89,48,96,198,121,147,116,37,146,13,149,28,145,65,178,132,29,6,197,175,134,45}
+\end{itemize}

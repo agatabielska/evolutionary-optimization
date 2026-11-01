@@ -4,110 +4,207 @@
 #include "solutions/task1.h"
 #include "solutions/task2.h"
 #include "solutions/task3.h"
+#include "solutions/task4.h"
+
+#include <chrono>
+#include <functional>
 #include <iostream>
-#include <cmath>
 #include <memory>
+#include <string>
+#include <utility>
+#include <vector>
 
-int main() {
-    // Read the datasets and initialize the distance matrix and node costs
-    read_distance_matrix();
-    
-    for (int dataset = 0; dataset < 2; ++dataset) {
+namespace {
 
-        std::cout << "\n--- Dataset " << (dataset == 0 ? "TSPA" : "TSPB") << " ---" << std::endl;
-        ResultManager random_result_manager;
-        random_result_manager.repetitions = 200;
-        random_result_manager.dataset = dataset;
-        task1_random_solver(random_result_manager);
+const std::string kOutputDir = "calculated_solutions/";
+constexpr int kSolutionSize = 100;
+constexpr int kRepetitions = 200;
 
-        random_result_manager.save_best_solution_to_file("calculated_solutions/random_solution_dataset_" + std::to_string(dataset) + ".txt", 100);
-        
-        ResultManager nn_result_manager;
-        nn_result_manager.dataset = dataset;
-        task1_nn_end_of_path(nn_result_manager);
+std::string dataset_name(int dataset) { return dataset == 0 ? "TSPA" : "TSPB"; }
+std::string dataset_tag(int dataset) { return dataset == 0 ? "tspa" : "tspb"; }
 
-        nn_result_manager.save_best_solution_to_file("calculated_solutions/nn_solution_dataset_" + std::to_string(dataset) + ".txt", 100);
-        
-        ResultManager nn_anywhere_at_path_result_manager;
-        nn_anywhere_at_path_result_manager.dataset = dataset;
-        task1_nn_anywhere_at_path(nn_anywhere_at_path_result_manager);
-        nn_anywhere_at_path_result_manager.save_best_solution_to_file("calculated_solutions/nn_anywhere_at_path_solution_dataset_" + std::to_string(dataset) + ".txt", 100);
-    
-        ResultManager greedy_manager;
-        greedy_manager.dataset = dataset;
-        task1_greedy_cycle(greedy_manager);
-        greedy_manager.save_best_solution_to_file("calculated_solutions/greedy_dataset_" + std::to_string(dataset) + ".txt", 100);
+// Common naming scheme of every output file:
+//   task<N>-<kind>-<dataset>[-<description>].<extension>
+// kind is "solution" (best solution found), "report" (result tables) or "plot" (SVG picture).
+// Examples: task3-report-tspa.txt, task3-solution-tspa-steepest-edge-random-start.txt,
+//           task3-plot-tspa.svg
+std::string output_path(int task, const std::string& kind, int dataset,
+                        const std::string& description = "",
+                        const std::string& extension = "txt") {
+    std::string name = "task" + std::to_string(task) + "-" + kind + "-" + dataset_tag(dataset);
+    if (!description.empty()) {
+        name += "-" + description;
+    }
+    return kOutputDir + name + "." + extension;
+}
 
-        generate_dataset_plot(dataset, {
-            {"Random", random_result_manager},
-            {"Nearest neighbor (end)", nn_result_manager},
-            {"Nearest neighbor (any position)", nn_anywhere_at_path_result_manager},
-            {"Greedy cycle", greedy_manager},
-        });
-        ResultManager task2_nn_regret_manager;
-        task2_nn_regret_manager.dataset = dataset;
-        task2_nn_anywhere_regret(task2_nn_regret_manager);
-        task2_nn_regret_manager.save_best_solution_to_file("calculated_solutions/task2_nn_anywhere_regret_dataset_" + std::to_string(dataset) + ".txt", 100);
+// One plot per task and dataset, e.g. calculated_solutions/task4-plot-tspa.svg
+std::string plot_path(int task, int dataset) {
+    return output_path(task, "plot", dataset, "", "svg");
+}
 
-        ResultManager task2_nn_weighted_manager;
-        task2_nn_weighted_manager.dataset = dataset;
-        task2_nn_anywhere_weighted(task2_nn_weighted_manager);
-        task2_nn_weighted_manager.save_best_solution_to_file("calculated_solutions/task2_nn_anywhere_weighted_dataset_" + std::to_string(dataset) + ".txt", 100);
+// Runs `solver` on the manager and saves the best solution found.
+void run_and_save(ResultManager& manager, int dataset, int task, const std::string& description,
+                  const std::function<void(ResultManager&)>& solver) {
+    manager.dataset = dataset;
+    // reset the clock: all managers of a task are constructed together, so without this the
+    // "Time:" line of a later method would also include the time of the earlier methods
+    manager.start_time = std::chrono::high_resolution_clock::now();
+    solver(manager);
+    // Task 1 / 2 solvers do not time their runs individually. If nothing was recorded, spread the
+    // total time over the runs, so the report shows the average time per run (min = max = average).
+    if (manager.run_times_ms.empty() && manager.evaluations_count > 0) {
+        const double total_ms = std::chrono::duration<double, std::milli>(
+            std::chrono::high_resolution_clock::now() - manager.start_time).count();
+        for (int i = 0; i < manager.evaluations_count; ++i) {
+            manager.record_run_time(total_ms / manager.evaluations_count);
+        }
+    }
+    manager.save_best_solution_to_file(output_path(task, "solution", dataset, description),
+                                       kSolutionSize);
+}
 
-        ResultManager task2_cycle_regret_manager;
-        task2_cycle_regret_manager.dataset = dataset;
-        task2_greedy_cycle_regret(task2_cycle_regret_manager);
-        task2_cycle_regret_manager.save_best_solution_to_file("calculated_solutions/task2_greedy_cycle_regret_dataset_" + std::to_string(dataset) + ".txt", 100);
+void run_task1(int dataset) {
+    ResultManager random_manager, nn_end_manager, nn_any_manager, greedy_manager;
+    random_manager.repetitions = kRepetitions;
 
-        ResultManager task2_cycle_weighted_manager;
-        task2_cycle_weighted_manager.dataset = dataset;
-        task2_greedy_cycle_weighted(task2_cycle_weighted_manager);
-        task2_cycle_weighted_manager.save_best_solution_to_file("calculated_solutions/task2_greedy_cycle_weighted_dataset_" + std::to_string(dataset) + ".txt", 100);
+    run_and_save(random_manager, dataset, 1, "random", task1_random_solver);
+    run_and_save(nn_end_manager, dataset, 1, "nn-end", task1_nn_end_of_path);
+    run_and_save(nn_any_manager, dataset, 1, "nn-any", task1_nn_anywhere_at_path);
+    run_and_save(greedy_manager, dataset, 1, "greedy-cycle", task1_greedy_cycle);
 
-        generate_task2_dataset_plot(dataset, {
-            {"Nearest neighbor (regret)", task2_nn_regret_manager},
-            {"Nearest neighbor (weighted)", task2_nn_weighted_manager},
-            {"Greedy cycle (regret)", task2_cycle_regret_manager},
-            {"Greedy cycle (weighted)", task2_cycle_weighted_manager},
-        });
+    // result tables (objective + running time), same format as the Task 3 / Task 4 reports
+    write_local_search_report(output_path(1, "report", dataset), {
+        {"Random", &random_manager},
+        {"Nearest neighbor (end)", &nn_end_manager},
+        {"Nearest neighbor (any position)", &nn_any_manager},
+        {"Greedy cycle", &greedy_manager},
+    });
 
-        std::vector<std::unique_ptr<ResultManager>> local_results;
-        std::vector<std::string> local_names;
-        std::vector<std::pair<std::string, const ResultManager*>> report_methods;
-        std::vector<PlotMethod> plot_methods;
-        local_names.reserve(8);
-        report_methods.reserve(8);
-        plot_methods.reserve(8);
-        for (bool steepest : {false, true}) {
-            for (bool use_edges : {false, true}) {
-                for (bool greedy_start : {false, true}) {
-                    auto result = std::make_unique<ResultManager>();
-                    result->dataset = dataset;
-                    run_local_search(*result, steepest, use_edges, greedy_start);
-                    const std::string method_name =
-                        local_search_method_name(steepest, use_edges, greedy_start);
-                    local_names.push_back(method_name);
-                    const std::string dataset_name = dataset == 0 ? "TSPA" : "TSPB";
-                    const std::string search_name = steepest ? "steepest" : "greedy";
-                    const std::string move_name =
-                        use_edges ? "edge_exchange" : "node_exchange";
-                    const std::string start_name =
-                        greedy_start ? "weighted_nn_start" : "random_start";
-                    result->save_best_solution_to_file(
-                        "calculated_solutions/local_search_" + dataset_name + "_" +
-                            search_name + "_" + move_name + "_" + start_name + ".txt",
-                        100, method_name);
-                    report_methods.emplace_back(local_names.back(), result.get());
-                    plot_methods.push_back(
-                        {local_names.back().c_str(), *result});
-                    local_results.push_back(std::move(result));
-                }
+    generate_dataset_plot(dataset, {
+        {"Random", random_manager},
+        {"Nearest neighbor (end)", nn_end_manager},
+        {"Nearest neighbor (any position)", nn_any_manager},
+        {"Greedy cycle", greedy_manager},
+    }, plot_path(1, dataset));
+}
+
+void run_task2(int dataset) {
+    ResultManager nn_regret, nn_weighted, cycle_regret, cycle_weighted;
+
+    run_and_save(nn_regret, dataset, 2, "nn-regret", task2_nn_anywhere_regret);
+    // the weighted solvers have extra defaulted parameters, so they are wrapped in lambdas
+    run_and_save(nn_weighted, dataset, 2, "nn-weighted",
+                 [](ResultManager& r) { task2_nn_anywhere_weighted(r); });
+    run_and_save(cycle_regret, dataset, 2, "cycle-regret", task2_greedy_cycle_regret);
+    run_and_save(cycle_weighted, dataset, 2, "cycle-weighted",
+                 [](ResultManager& r) { task2_greedy_cycle_weighted(r); });
+
+    write_local_search_report(output_path(2, "report", dataset), {
+        {"Nearest neighbor (regret)", &nn_regret},
+        {"Nearest neighbor (weighted)", &nn_weighted},
+        {"Greedy cycle (regret)", &cycle_regret},
+        {"Greedy cycle (weighted)", &cycle_weighted},
+    });
+
+    generate_dataset_plot(dataset, {
+        {"Nearest neighbor (regret)", nn_regret},
+        {"Nearest neighbor (weighted)", nn_weighted},
+        {"Greedy cycle (regret)", cycle_regret},
+        {"Greedy cycle (weighted)", cycle_weighted},
+    }, plot_path(2, dataset));
+}
+
+// Task 3: all 8 combinations of steepest/greedy x node/edge exchange x random/greedy start.
+void run_task3(int dataset) {
+    std::vector<std::unique_ptr<ResultManager>> results;
+    std::vector<std::string> names;  // reserved up front: plot_methods keeps pointers into it
+    std::vector<std::pair<std::string, const ResultManager*>> report_methods;
+    std::vector<PlotMethod> plot_methods;
+    names.reserve(8);
+    report_methods.reserve(8);
+    plot_methods.reserve(8);
+
+    for (bool steepest : {false, true}) {
+        for (bool use_edges : {false, true}) {
+            for (bool greedy_start : {false, true}) {
+                auto result = std::make_unique<ResultManager>();
+                result->dataset = dataset;
+                run_local_search(*result, steepest, use_edges, greedy_start);
+
+                names.push_back(local_search_method_name(steepest, use_edges, greedy_start));
+                const std::string description = std::string(steepest ? "steepest" : "greedy") + "-" +
+                                                (use_edges ? "edge" : "node") + "-" +
+                                                (greedy_start ? "greedy-start" : "random-start");
+                result->save_best_solution_to_file(output_path(3, "solution", dataset, description),
+                                                   kSolutionSize, names.back());
+
+                report_methods.emplace_back(names.back(), result.get());
+                plot_methods.push_back({names.back().c_str(), *result});
+                results.push_back(std::move(result));
             }
         }
-        write_local_search_report(
-            std::string("calculated_solutions/local_search_report_") +
-                (dataset == 0 ? "TSPA" : "TSPB") + ".txt",
-            report_methods);
-        generate_local_search_dataset_plot(dataset, plot_methods);
+    }
+
+    write_local_search_report(output_path(3, "report", dataset), report_methods);
+    generate_dataset_plot(dataset, plot_methods, plot_path(3, dataset));
+}
+
+// Task 4: steepest local search (edge exchange + inter-route exchange) with candidate moves.
+// Baseline: the unmodified Task 3 steepest local search with random starts.
+void run_task4(int dataset) {
+    // the same random starting solutions for all methods (paired comparison)
+    const auto starts = task4_make_random_starts(kRepetitions, 20260 + dataset);
+
+    std::vector<std::unique_ptr<ResultManager>> results;
+    std::vector<std::string> names;  // reserved up front: plot_methods keeps pointers into it
+    std::vector<std::pair<std::string, const ResultManager*>> report_methods;
+    std::vector<std::pair<std::string, Task4Stats>> stats;
+    std::vector<PlotMethod> plot_methods;
+    constexpr int kMaxMethods = 8;
+    names.reserve(kMaxMethods);
+    report_methods.reserve(kMaxMethods);
+    stats.reserve(kMaxMethods);
+    plot_methods.reserve(kMaxMethods);
+
+    auto run_method = [&](const std::string& method_name, const std::string& description,
+                          const std::function<Task4Stats(ResultManager&)>& runner) {
+        auto result = std::make_unique<ResultManager>();
+        result->dataset = dataset;
+        Task4Stats method_stats = runner(*result);
+        result->save_best_solution_to_file(output_path(4, "solution", dataset, description),
+                                           kSolutionSize, method_name);
+
+        names.push_back(method_name);
+        report_methods.emplace_back(names.back(), result.get());
+        stats.emplace_back(names.back(), method_stats);
+        plot_methods.push_back({names.back().c_str(), *result});
+        results.push_back(std::move(result));
+    };
+
+    run_method("Steepest + edge exchange + random start (baseline)", "steepest-baseline",
+               [&](ResultManager& r) { return task4_steepest_baseline(r, starts); });
+    for (int k : {5, 10, 15, 20}) {
+        run_method("Steepest + candidate moves (k = " + std::to_string(k) + ") + random start",
+                   "steepest-candidates-k" + std::to_string(k),
+                   [&, k](ResultManager& r) { return task4_steepest_candidates(r, starts, k); });
+    }
+
+    write_local_search_report(output_path(4, "report", dataset), report_methods);
+    write_task4_stats(output_path(4, "report", dataset, "moves"), stats);
+    generate_dataset_plot(dataset, plot_methods, plot_path(4, dataset));
+}
+
+}  // namespace
+
+int main() {
+    read_distance_matrix();
+
+    for (int dataset = 0; dataset < 2; ++dataset) {
+        std::cout << "\n--- Dataset " << dataset_name(dataset) << " ---" << std::endl;
+        run_task1(dataset);
+        run_task2(dataset);
+        run_task3(dataset);
+        run_task4(dataset);
     }
 }

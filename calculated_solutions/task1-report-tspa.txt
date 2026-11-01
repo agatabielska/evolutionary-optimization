@@ -1,0 +1,13 @@
+Objective values (average (minimum - maximum))
+Method                                                                Average (min - max)
+Random                                                                261888.86 (236753 - 292845)
+Nearest neighbor (end)                                                87476.63 (84362 - 90075)
+Nearest neighbor (any position)                                       74346.96 (72328 - 77022)
+Greedy cycle                                                          73793.40 (72590 - 75281)
+
+Running times in milliseconds (average (minimum - maximum))
+Method                                                                Average (min - max)
+Random                                                                   0.002 (0.002 - 0.002)
+Nearest neighbor (end)                                                   0.041 (0.041 - 0.041)
+Nearest neighbor (any position)                                          1.180 (1.180 - 1.180)
+Greedy cycle                                                             2.770 (2.770 - 2.770)

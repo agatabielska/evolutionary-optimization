@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <filesystem>
 #include <fstream>
+#include <iostream>
 #include <string>
 #include <vector>
 
@@ -73,9 +74,14 @@ inline void write_plot_panel(std::ofstream& file, const PlotMethod& method,
     }
 }
 
+// Draws the best solution of every method as one panel (two panels per row) and saves
+// the whole picture to `output_path` (an .svg file; missing directories are created).
 inline void generate_dataset_plot(int dataset, const std::vector<PlotMethod>& methods,
-                                 const std::string& file_suffix = "best_solutions") {
-    std::filesystem::create_directories("calculated_solutions");
+                                  const std::string& output_path) {
+    const std::filesystem::path parent = std::filesystem::path(output_path).parent_path();
+    if (!parent.empty()) {
+        std::filesystem::create_directories(parent);
+    }
 
     int min_x = NODE_X[0][dataset], max_x = NODE_X[0][dataset];
     int min_y = NODE_Y[0][dataset], max_y = NODE_Y[0][dataset];
@@ -91,12 +97,9 @@ inline void generate_dataset_plot(int dataset, const std::vector<PlotMethod>& me
 
     const int panel_width = 700;
     const int panel_height = 520;
-    const std::string dataset_name = dataset == 0 ? "TSPA" : "TSPB";
-    const std::string output_path = "calculated_solutions/" + dataset_name +
-                                   "_" + file_suffix + ".svg";
     std::ofstream file(output_path);
     if (!file.is_open()) {
-        std::cerr << "Error opening SVG plot for dataset " << dataset << '\n';
+        std::cerr << "Error opening SVG plot: " << output_path << '\n';
         return;
     }
 
@@ -107,22 +110,12 @@ inline void generate_dataset_plot(int dataset, const std::vector<PlotMethod>& me
          << canvas_height << "\" viewBox=\"0 0 1400 " << canvas_height << "\">\n";
     file << "<rect width=\"100%\" height=\"100%\" fill=\"#eeeeee\"/>\n";
     for (size_t i = 0; i < methods.size(); ++i) {
-        write_plot_panel(file, methods[i], static_cast<int>(i % 2) * panel_width,
-                         static_cast<int>(i / 2) * panel_height, panel_width,
+        write_plot_panel(file, methods[i], static_cast<int>(i % columns) * panel_width,
+                         static_cast<int>(i / columns) * panel_height, panel_width,
                          panel_height, min_x, max_x, min_y, max_y, min_cost,
                          max_cost);
     }
 
     file << "</svg>\n";
     std::cout << "Saved plot: " << output_path << '\n';
-}
-
-inline void generate_task2_dataset_plot(int dataset,
-                                        const std::vector<PlotMethod>& methods) {
-    generate_dataset_plot(dataset, methods, "task2_best_solutions");
-}
-
-inline void generate_local_search_dataset_plot(
-    int dataset, const std::vector<PlotMethod>& methods) {
-    generate_dataset_plot(dataset, methods, "local_search_best_solutions");
 }
