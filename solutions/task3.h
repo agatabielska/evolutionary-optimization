@@ -207,26 +207,86 @@ inline std::vector<int> weighted_nn_start_solution(int start_node, int dataset) 
     return path;
 }
 
+inline bool try_greedy_move(std::vector<int>& solution, int dataset,
+                            bool use_edges, std::mt19937& generator) {
+    std::vector<bool> selected(total_nodes, false);
+    std::vector<int> outside_nodes;
+    outside_nodes.reserve(total_nodes - solution_size);
+    for (int node : solution) {
+        selected[node] = true;
+    }
+    for (int node = 0; node < total_nodes; ++node) {
+        if (!selected[node]) {
+            outside_nodes.push_back(node);
+        }
+    }
+
+    const int intra_moves =
+        use_edges ? solution_size * (solution_size - 3) / 2
+                  : solution_size * (solution_size - 1) / 2;
+    const int inter_moves = solution_size * static_cast<int>(outside_nodes.size());
+    const int total_moves = intra_moves + inter_moves;
+
+    std::uniform_int_distribution<int> index_distribution(0, total_moves - 1);
+    const int offset = index_distribution(generator);
+    int stride = index_distribution(generator) | 1;
+    while (std::gcd(stride, total_moves) != 1) {
+        stride = (stride + 2) % total_moves;
+        if (stride == 0) {
+            stride = 1;
+        }
+    }
+
+    for (int step = 0; step < total_moves; ++step) {
+        const int rank =
+            (offset + static_cast<int>((static_cast<long long>(step) * stride) %
+                                        total_moves)) %
+            total_moves;
+        Move move{};
+        if (rank < intra_moves) {
+            int remaining = rank;
+            int first = 0;
+            while (true) {
+                const int row_size =
+                    use_edges
+                        ? solution_size - first - 2 -
+                              (first == 0 ? 1 : 0)
+                        : solution_size - first - 1;
+                if (remaining < row_size) {
+                    int second = first + (use_edges ? 2 : 1) + remaining;
+                    move = {use_edges ? MoveType::edge_exchange
+                                      : MoveType::node_exchange,
+                            first, second, -1};
+                    break;
+                }
+                remaining -= row_size;
+                ++first;
+            }
+        } else {
+            const int inter_rank = rank - intra_moves;
+            move = {MoveType::inter_route_exchange,
+                    inter_rank / static_cast<int>(outside_nodes.size()), -1,
+                    outside_nodes[inter_rank % outside_nodes.size()]};
+        }
+        if (delta(solution, move, dataset) < 0) {
+            apply_move(solution, move);
+            return true;
+        }
+    }
+    return false;
+}
+
 inline void improve(std::vector<int>& solution, int dataset, bool steepest,
                     bool use_edges, std::mt19937& generator) {
     while (true) {
-        std::vector<Move> moves = neighborhood(solution, use_edges);
         if (!steepest) {
-            std::shuffle(moves.begin(), moves.end(), generator);
-            bool improved = false;
-            for (const Move& move : moves) {
-                if (delta(solution, move, dataset) < 0) {
-                    apply_move(solution, move);
-                    improved = true;
-                    break;
-                }
-            }
-            if (!improved) {
+            if (!try_greedy_move(solution, dataset, use_edges, generator)) {
                 return;
             }
             continue;
         }
 
+        std::vector<Move> moves = neighborhood(solution, use_edges);
         int best_delta = 0;
         const Move* best_move = nullptr;
         for (const Move& move : moves) {
