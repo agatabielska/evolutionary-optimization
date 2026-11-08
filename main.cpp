@@ -242,6 +242,63 @@ void run_task5(int dataset) {
     generate_dataset_plot(dataset, plot_methods, plot_path(5, dataset));
 }
 
+// Task 5 (optional): list of improving moves combined with candidate moves.
+// Separate experiment, files: task5-*-<dataset>-combined.*
+void run_task5_combined(int dataset) {
+    const auto starts = task4_make_random_starts(kRepetitions, 20260 + dataset);
+    std::vector<std::unique_ptr<ResultManager>> results;
+    std::vector<std::string> names;
+    std::vector<std::pair<std::string, const ResultManager*>> report_methods;
+    std::vector<std::pair<std::string, Task5Stats>> stats;
+    std::vector<PlotMethod> plot_methods;
+    constexpr int kMaxMethods = 8;
+    names.reserve(kMaxMethods);
+    report_methods.reserve(kMaxMethods);
+    stats.reserve(kMaxMethods);
+    plot_methods.reserve(kMaxMethods);
+
+    auto run_method = [&](const std::string& method_name, const std::string& description,
+                          const std::function<void(ResultManager&, Task5Stats&)>& runner) {
+        auto result = std::make_unique<ResultManager>();
+        result->dataset = dataset;
+        Task5Stats method_stats;
+        runner(*result, method_stats);
+        result->save_best_solution_to_file(
+            output_path(5, "solution", dataset, "combined-" + description), kSolutionSize,
+            method_name);
+        names.push_back(method_name);
+        report_methods.emplace_back(names.back(), result.get());
+        stats.emplace_back(names.back(), method_stats);
+        plot_methods.push_back({names.back().c_str(), *result});
+        results.push_back(std::move(result));
+    };
+
+    run_method("Steepest + edge exchange + random start (baseline)", "steepest-baseline",
+               [&](ResultManager& result, Task5Stats& s) {
+                   const Task4Stats b = task4_steepest_baseline(result, starts);
+                   s.runs = b.runs;
+                   s.evaluated_moves = b.evaluated_moves;
+                   s.applied_moves = b.applied_moves;
+               });
+    run_method("Steepest + improving move list + random start", "improving-list",
+               [&](ResultManager& result, Task5Stats& s) {
+                   s = task5_improving_list(result, starts);
+               });
+    for (int k : {5, 10, 15, 20}) {
+        run_method("Steepest + improving move list + candidate moves (k = " +
+                       std::to_string(k) + ") + random start",
+                   "improving-list-candidates-k" + std::to_string(k),
+                   [&, k](ResultManager& result, Task5Stats& s) {
+                       s = task5_improving_list_candidates(result, starts, k);
+                   });
+    }
+
+    write_local_search_report(output_path(5, "report", dataset, "combined"), report_methods);
+    write_task5_stats(output_path(5, "report", dataset, "combined-moves"), stats);
+    generate_dataset_plot(dataset, plot_methods,
+                          output_path(5, "plot", dataset, "combined", "svg"));
+}
+
 }  // namespace
 
 int main(int argc, char** argv) {
@@ -260,5 +317,6 @@ int main(int argc, char** argv) {
             run_task4(dataset);
         }
         run_task5(dataset);
+        run_task5_combined(dataset);
     }
 }

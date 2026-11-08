@@ -1,4 +1,4 @@
-"""Generate copy-ready LaTeX tables and solution sections for task 3 and task 4.
+"""Generate copy-ready LaTeX tables and solution sections for tasks 3--5.
 
 Reads the files written by main.cpp from calculated_solutions/task<N>/ and writes
 the LaTeX output into the corresponding task directory.
@@ -26,9 +26,10 @@ class Result:
     time_average: float | None = None
     time_minimum: float | None = None
     time_maximum: float | None = None
-    evaluated: float | None = None   # task 4: average evaluated moves per run
-    applied: float | None = None     # task 4: average applied moves per run
-    lists_ms: float | None = None    # task 4: one-off time of building candidate lists
+    evaluated: float | None = None
+    generated: float | None = None   # task 5: average moves added to LM per run
+    applied: float | None = None
+    lists_ms: float | None = None
     best_solution: str = ""
 
 
@@ -60,7 +61,7 @@ def parse_number(text: str) -> float | None:
 
 
 REPORT_LINE = re.compile(
-    r"^(.*?)\s+(-?\d+(?:\.\d+)?) \((-?\d+(?:\.\d+)?) - (-?\d+(?:\.\d+)?)\)$"
+    r"^(.*?)(-?\d+(?:\.\d+)?)\s+\((-?\d+(?:\.\d+)?)\s+-\s+(-?\d+(?:\.\d+)?)\)$"
 )
 
 
@@ -100,6 +101,32 @@ def read_moves(path: Path) -> dict[str, Result]:
         evaluated, applied, lists_ms = (parse_number(value) for value in match.groups()[1:])
         results[match.group(1).rstrip()] = Result(
             evaluated=evaluated, applied=applied, lists_ms=lists_ms)
+    return results
+
+
+TASK5_MOVES_LINE = re.compile(
+    r"(-|\d+(?:\.\d+)?)\s+(-|\d+(?:\.\d+)?)\s+"
+    r"(-|\d+(?:\.\d+)?)\s+(-|\d+(?:\.\d+)?)\s*$"
+)
+
+
+def read_task5_moves(path: Path) -> dict[str, Result]:
+    """Evaluated, added-to-LM, and applied move counts written by Task 5."""
+    results: dict[str, Result] = {}
+    for line in path.read_text().splitlines():
+        match = TASK5_MOVES_LINE.search(line)
+        if not match:
+            continue
+        method_name = line[:match.start()].rstrip()
+        if method_name == "Method":
+            continue
+        evaluated, generated, applied, lists_ms = (
+            parse_number(value) for value in match.groups()
+        )
+        results[method_name] = Result(
+            evaluated=evaluated, generated=generated, applied=applied,
+            lists_ms=lists_ms
+        )
     return results
 
 
@@ -150,6 +177,18 @@ TASK4_METHODS = [
     for k in CANDIDATE_COUNTS
 ]
 
+TASK5_METHODS = [
+    ("Steepest LS (baseline)", "Steepest + edge exchange + random start (baseline)",
+     "steepest-baseline"),
+    ("Steepest LS + improving move list", "Steepest + improving move list + random start",
+     "improving-list"),
+] + [
+    (f"Steepest LS + improving move list + candidates ($k = {k}$)",
+     f"Steepest + improving move list + candidate moves (k = {k}) + random start",
+     f"improving-list-candidates-k{k}")
+    for k in CANDIDATE_COUNTS
+]
+
 
 def earlier_rows(results_dir: Path, dataset: str) -> list[Row]:
     rows = []
@@ -185,6 +224,23 @@ def task4_rows(results_dir: Path, dataset: str) -> list[Row]:
             report[report_name],
             evaluated=counted.evaluated, applied=counted.applied, lists_ms=counted.lists_ms,
             best_solution=best_solution(results_dir, 4, dataset, description))))
+    return rows
+
+
+def task5_rows(results_dir: Path, dataset: str) -> list[Row]:
+    report = read_report(report_file(results_dir, 5, dataset, "combined"))
+    moves = read_task5_moves(report_file(results_dir, 5, dataset, "combined-moves"))
+    rows = []
+    for name, report_name, description in TASK5_METHODS:
+        counted = moves[report_name]
+        rows.append(Row(name, "baseline" if description == "steepest-baseline"
+                        else "improving_list", replace(
+                            report[report_name],
+                            evaluated=counted.evaluated,
+                            generated=counted.generated,
+                            applied=counted.applied,
+                            best_solution=best_solution(
+                                results_dir, 5, dataset, f"combined-{description}"))))
     return rows
 
 
@@ -280,6 +336,28 @@ def moves_table(rows_a: list[Row], rows_b: list[Row], caption: str, label: str) 
     return table_lines(caption, label, r"p{7.2cm} X X X X", header, body)
 
 
+def task5_moves_table(rows_a: list[Row], rows_b: list[Row],
+                      caption: str, label: str) -> str:
+    header = (
+        r"\textbf{Method} & \textbf{A: evaluated} & \textbf{A: added} & "
+        r"\textbf{A: applied} & \textbf{B: evaluated} & \textbf{B: added} & "
+        r"\textbf{B: applied} \\"
+    )
+    body = []
+    for index, row in enumerate(rows_a):
+        if index == 1:
+            body.append(r"\cmidrule{1-7}")
+        body.append(
+            f"{row.name} & {moves_cell(rows_a, index, 'evaluated', True)} & "
+            f"{moves_cell(rows_a, index, 'generated', False)} & "
+            f"{moves_cell(rows_a, index, 'applied', False)} & "
+            f"{moves_cell(rows_b, index, 'evaluated', True)} & "
+            f"{moves_cell(rows_b, index, 'generated', False)} & "
+            f"{moves_cell(rows_b, index, 'applied', False)} \\\\"
+        )
+    return table_lines(caption, label, r"p{5.8cm} X X X X X X", header, body)
+
+
 def solution_section(dataset: str, rows: list[Row]) -> str:
     lines = [rf"\subsection{{Instance {INSTANCE[dataset]}}}",
              r"\begin{itemize}[leftmargin=1.5em]"]
@@ -359,18 +437,48 @@ def task4_latex(results_dir: Path) -> str:
     ]) + "\n"
 
 
+def task5_latex(results_dir: Path) -> str:
+    tspa, tspb = (task5_rows(results_dir, dataset) for dataset in DATASETS)
+    separators = (1,)
+    objective = metric_table(
+        tspa, tspb, fields=OBJECTIVE_FIELDS, decimals=0, separators=separators,
+        use_categories=False, label="tab:task5_obj",
+        header=(r"\textbf{Method} & \textbf{Instance A: av (min -- max)} & "
+                r"\textbf{Instance B: av (min -- max)} \\"),
+        caption=(r"Objective function values reported as \texttt{average (min -- max)} across "
+                 r"200 paired random starts. The baseline uses the complete steepest "
+                 r"neighborhood; the other methods reuse improving move evaluations."))
+    running_time = metric_table(
+        tspa, tspb, fields=TIME_FIELDS, decimals=3, separators=separators,
+        use_categories=False, label="tab:task5_time",
+        header=(r"\textbf{Method} & \textbf{Instance A [ms]: av (min -- max)} & "
+                r"\textbf{Instance B [ms]: av (min -- max)} \\"),
+        caption=(r"Running times in milliseconds per single run across 200 paired random "
+                 r"starts. $k$ denotes the candidate-list size."))
+    moves = task5_moves_table(
+        tspa, tspb, label="tab:task5_moves",
+        caption=(r"Average move-list operations per run across 200 paired random starts. "
+                 r"Evaluated counts newly calculated deltas, added counts improving moves "
+                 r"inserted into LM, and applied counts accepted moves."))
+    return "\n\n".join([
+        objective, running_time, moves,
+        solution_section("TSPA", tspa),
+        solution_section("TSPB", tspb),
+    ]) + "\n"
+
+
 def longest_list_time(rows: list[Row]) -> float:
     return max((row.result.lists_ms for row in rows if row.result.lists_ms is not None),
                default=0.0)
 
 
-GENERATORS = {"3": task3_latex, "4": task4_latex}
+GENERATORS = {"3": task3_latex, "4": task4_latex, "5": task5_latex}
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--results-dir", type=Path, default=Path("calculated_solutions"))
-    parser.add_argument("--task", choices=["3", "4", "all"], default="all")
+    parser.add_argument("--task", choices=["3", "4", "5", "all"], default="all")
     args = parser.parse_args()
 
     tasks = list(GENERATORS) if args.task == "all" else [args.task]

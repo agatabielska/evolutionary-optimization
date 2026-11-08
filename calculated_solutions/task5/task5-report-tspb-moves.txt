@@ -1,4 +1,4 @@
 Average move-list statistics per run
-Method                                                               Evaluated     Added to LM         Applied
-Steepest + edge exchange + random start (baseline)                   1988563.5             0.0           132.9
-Steepest + improving move list + random start                         124088.4         13519.2           132.9
+Method                                                               Evaluated     Added to LM         Applied  Full evaluations
+Steepest + edge exchange + random start (baseline)                   1988563.5             0.0           132.9                 -
+Steepest + improving move list + random start                         176610.5         11252.2           151.1               9.0
