@@ -5,8 +5,10 @@
 #include "solutions/task2.h"
 #include "solutions/task3.h"
 #include "solutions/task4.h"
+#include "solutions/task5.h"
 
 #include <chrono>
+#include <filesystem>
 #include <functional>
 #include <iostream>
 #include <memory>
@@ -35,7 +37,7 @@ std::string output_path(int task, const std::string& kind, int dataset,
     if (!description.empty()) {
         name += "-" + description;
     }
-    return kOutputDir + name + "." + extension;
+    return kOutputDir + "task" + std::to_string(task) + "/" + name + "." + extension;
 }
 
 // One plot per task and dataset, e.g. calculated_solutions/task4-plot-tspa.svg
@@ -195,16 +197,68 @@ void run_task4(int dataset) {
     generate_dataset_plot(dataset, plot_methods, plot_path(4, dataset));
 }
 
+// Task 5: steepest local search with a persistent list of improving move deltas.
+void run_task5(int dataset) {
+    const auto starts = task4_make_random_starts(kRepetitions, 20260 + dataset);
+    std::vector<std::unique_ptr<ResultManager>> results;
+    std::vector<std::string> names;
+    std::vector<std::pair<std::string, const ResultManager*>> report_methods;
+    std::vector<std::pair<std::string, Task5Stats>> stats;
+    std::vector<PlotMethod> plot_methods;
+    names.reserve(2);
+    report_methods.reserve(2);
+    stats.reserve(2);
+    plot_methods.reserve(2);
+
+    auto run_method = [&](const std::string& method_name, const std::string& description,
+                          const std::function<void(ResultManager&, Task5Stats&)>& runner) {
+        auto result = std::make_unique<ResultManager>();
+        result->dataset = dataset;
+        Task5Stats method_stats;
+        runner(*result, method_stats);
+        result->save_best_solution_to_file(output_path(5, "solution", dataset, description),
+                                           kSolutionSize, method_name);
+        names.push_back(method_name);
+        report_methods.emplace_back(names.back(), result.get());
+        stats.emplace_back(names.back(), method_stats);
+        plot_methods.push_back({names.back().c_str(), *result});
+        results.push_back(std::move(result));
+    };
+
+    run_method("Steepest + edge exchange + random start (baseline)", "steepest-baseline",
+               [&](ResultManager& result, Task5Stats& method_stats) {
+                   const Task4Stats baseline = task4_steepest_baseline(result, starts);
+                   method_stats.runs = baseline.runs;
+                   method_stats.evaluated_moves = baseline.evaluated_moves;
+                   method_stats.applied_moves = baseline.applied_moves;
+               });
+    run_method("Steepest + improving move list + random start", "steepest-improving-list",
+               [&](ResultManager& result, Task5Stats& method_stats) {
+                   method_stats = task5_improving_list(result, starts);
+               });
+
+    write_local_search_report(output_path(5, "report", dataset), report_methods);
+    write_task5_stats(output_path(5, "report", dataset, "moves"), stats);
+    generate_dataset_plot(dataset, plot_methods, plot_path(5, dataset));
+}
+
 }  // namespace
 
-int main() {
+int main(int argc, char** argv) {
     read_distance_matrix();
+    for (int task = 1; task <= 5; ++task) {
+        std::filesystem::create_directories(kOutputDir + "task" + std::to_string(task));
+    }
 
     for (int dataset = 0; dataset < 2; ++dataset) {
         std::cout << "\n--- Dataset " << dataset_name(dataset) << " ---" << std::endl;
-        run_task1(dataset);
-        run_task2(dataset);
-        run_task3(dataset);
-        run_task4(dataset);
+        const bool only_task5 = argc > 1 && std::string(argv[1]) == "--task5";
+        if (!only_task5) {
+            run_task1(dataset);
+            run_task2(dataset);
+            run_task3(dataset);
+            run_task4(dataset);
+        }
+        run_task5(dataset);
     }
 }

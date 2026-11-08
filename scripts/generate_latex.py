@@ -1,7 +1,7 @@
 """Generate copy-ready LaTeX tables and solution sections for task 3 and task 4.
 
-Reads the files written by main.cpp (calculated_solutions/task<N>-<kind>-<dataset>-...)
-and writes calculated_solutions/task3-latex.tex and calculated_solutions/task4-latex.tex.
+Reads the files written by main.cpp from calculated_solutions/task<N>/ and writes
+the LaTeX output into the corresponding task directory.
 """
 
 from __future__ import annotations
@@ -38,12 +38,12 @@ class Row(NamedTuple):
     result: Result
 
 def solution_file(results_dir: Path, task: int, dataset: str, description: str) -> Path:
-    return results_dir / f"task{task}-solution-{dataset.lower()}-{description}.txt"
+    return results_dir / f"task{task}" / f"task{task}-solution-{dataset.lower()}-{description}.txt"
 
 
 def report_file(results_dir: Path, task: int, dataset: str, description: str = "") -> Path:
     suffix = f"-{description}" if description else ""
-    return results_dir / f"task{task}-report-{dataset.lower()}{suffix}.txt"
+    return results_dir / f"task{task}" / f"task{task}-report-{dataset.lower()}{suffix}.txt"
 
 
 def read_key_values(path: Path) -> dict[str, str]:
@@ -380,7 +380,7 @@ def main() -> None:
         except (FileNotFoundError, KeyError) as error:
             print(f"Task {task}: skipped, missing input ({error})")
             continue
-        path = args.results_dir / f"task{task}-latex.tex"
+        path = args.results_dir / f"task{task}" / f"task{task}-latex.tex"
         path.write_text(output)
         print(output, end="")
         print(f"\nWrote LaTeX to {path}\n", flush=True)

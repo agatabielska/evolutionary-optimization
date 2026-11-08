@@ -81,9 +81,20 @@ Each of the eight combinations is run 200 times. Random starts are generated
 by shuffling all 200 nodes and keeping the first 100. Greedy starts use the
 weighted nearest-neighbor construction from Assignment 2, with starting nodes
 0 through 199. The objective and running-time tables are written to
-`calculated_solutions/local_search_report_dataset_0.txt` and
-`calculated_solutions/local_search_report_dataset_1.txt`. Individual local
-search results and best-solution plots are written to the same directory.
+`calculated_solutions/task3/`. Individual local-search results and best-solution
+plots are written to the corresponding task directory.
+
+### Assignment 5: improving move list
+
+Task 5 compares the Task 4 steepest baseline with a steepest search that keeps
+a list of improving move deltas between iterations. The list contains both
+inter-route exchanges and 2-opt edge exchanges. Saved edge directions are
+checked when browsing the list: disappeared edges invalidate a move, one
+reversed edge defers it, and two consistently reversed edges remain
+applicable. New moves are evaluated for both relative edge orientations.
+Both methods use the same 200 random starting solutions for each instance.
+Task 5 reports objective values, running times, and evaluated/added/applied
+move counts.
 
 Sanity checks for the weighted methods: with `w1 = 0` the criterion reduces to
 pure greedy (it should reproduce the corresponding Assignment 1 results), with
@@ -108,16 +119,22 @@ makes 200 solutions.
     ├── data/
     │   ├── TSPA.csv              instance A
     │   └── TSPB.csv              instance B
-    └── calculated_solutions/     output files end up here
+    └── calculated_solutions/
+        ├── task1/                Assignment 1 outputs
+        ├── task2/                Assignment 2 outputs
+        ├── task3/                Assignment 3 outputs
+        ├── task4/                Assignment 4 outputs
+        └── task5/                Assignment 5 outputs
 
 Each data file has 200 lines in the form `x;y;cost`.
 
 ## Output
 
-For every method and instance a text file is written to `calculated_solutions/`.
-The file name contains the method and the dataset index (`dataset_0` = TSPA,
-`dataset_1` = TSPB), e.g. `greedy_cycle_regret_dataset_0.txt` or
-`nn_anywhere_weighted_dataset_1.txt`. Each file has the following content:
+For every method and instance a text file is written to its
+`calculated_solutions/task<N>/` directory.
+The file name contains the task, method, and dataset (`tspa` = TSPA,
+`tspb` = TSPB), e.g. `task2-solution-tspa-cycle-regret.txt`. Each file has the
+following content:
 
     Best Cost: ...
     Worst Cost: ...
@@ -173,12 +190,12 @@ cycle and regret methods are noticeably faster with optimizations on.
 Expected console output:
 
     --- Dataset TSPA ---
-    Saved plot: calculated_solutions/TSPA_best_solutions.svg
-    Saved plot: calculated_solutions/TSPA_task2_best_solutions.svg
+    Saved plot: calculated_solutions/task1/task1-plot-tspa.svg
+    Saved plot: calculated_solutions/task2/task2-plot-tspa.svg
 
     --- Dataset TSPB ---
-    Saved plot: calculated_solutions/TSPB_best_solutions.svg
-    Saved plot: calculated_solutions/TSPB_task2_best_solutions.svg
+    Saved plot: calculated_solutions/task1/task1-plot-tspb.svg
+    Saved plot: calculated_solutions/task2/task2-plot-tspb.svg
 
 The program prints the dataset headers and the two generated SVG file names for
 each dataset.

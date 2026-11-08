@@ -1,0 +1,9 @@
+Objective values (average (minimum - maximum))
+Method                                                                Average (min - max)
+Steepest + edge exchange + random start (baseline)                    52678.39 (50220 - 56889)
+Steepest + improving move list + random start                         52681.82 (50220 - 56930)
+
+Running times in milliseconds (average (minimum - maximum))
+Method                                                                Average (min - max)
+Steepest + edge exchange + random start (baseline)                      15.884 (12.801 - 26.434)
+Steepest + improving move list + random start                            3.479 (2.080 - 10.580)
