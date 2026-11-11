@@ -1,7 +1,7 @@
 Average number of evaluated and applied moves per run
 Method                                                               Evaluated     Applied  Candidate lists [ms]
 Steepest + edge exchange + random start (baseline)                   1991385.0       133.1                     -
-Steepest + candidate moves (k = 5) + random start                     102963.5       119.9                 0.230
-Steepest + candidate moves (k = 10) + random start                    226772.6       124.9                 0.340
-Steepest + candidate moves (k = 15) + random start                    358211.9       128.7                 0.433
-Steepest + candidate moves (k = 20) + random start                    494207.3       131.4                 0.640
+Steepest + candidate moves (k = 5) + random start                     102963.5       119.9                 0.367
+Steepest + candidate moves (k = 10) + random start                    226772.6       124.9                 0.332
+Steepest + candidate moves (k = 15) + random start                    358211.9       128.7                 0.427
+Steepest + candidate moves (k = 20) + random start                    494207.3       131.4                 0.554

@@ -6,12 +6,15 @@
 #include "solutions/task3.h"
 #include "solutions/task4.h"
 #include "solutions/task5.h"
+#include "solutions/task6.h"
 
 #include <chrono>
 #include <filesystem>
+#include <fstream>
 #include <functional>
 #include <iostream>
 #include <memory>
+#include <numeric>
 #include <string>
 #include <utility>
 #include <vector>
@@ -21,8 +24,10 @@ namespace {
 const std::string kOutputDir = "calculated_solutions/";
 constexpr int kSolutionSize = 100;
 constexpr int kRepetitions = 200;
+// Task 6
+constexpr int kMetaRuns = 20;         // runs of MSLS and of ILS per instance
+constexpr int kMslsIterations = 400;  // local searches in one run of MSLS
 
-std::string dataset_name(int dataset) { return dataset == 0 ? "TSPA" : "TSPB"; }
 std::string dataset_tag(int dataset) { return dataset == 0 ? "tspa" : "tspb"; }
 
 // Common naming scheme of every output file:
@@ -299,24 +304,143 @@ void run_task5_combined(int dataset) {
                           output_path(5, "plot", dataset, "combined", "svg"));
 }
 
+// Task 6: multiple start local search (MSLS) and iterated local search (ILS).
+// Both use the best local search of Task 5 (steepest + list of improving moves).
+//   1. MSLS: kMetaRuns runs of kMslsIterations local searches each. The average time of one
+//      run of MSLS is the time limit of every run of ILS.
+//   2. ILS with several perturbations (parameters in task6.h, struct PerturbConfig):
+//        only 1: b local double bridges in a window of W positions, no node replacement
+//        only 2: replacement of m selected nodes by non-selected ones, no double bridge
+//        both  : b double bridges + replacement of m nodes
+//      The default PerturbConfig is the setting presented as "the" ILS in the report.
+// Files (calculated_solutions/task6/): report (objective, time), ls-runs (number of local
+// searches), solution (best solution of every variant) and the plot.
+void task6_plot_from_file(int dataset);
+
+void run_task6(int dataset) {
+    using task6_detail::PerturbConfig;
+    std::vector<PerturbConfig> configs;  // {bridges, window, exchanges}
+    for (int w : {10, 20, 30, 50}) configs.push_back({1, w, 0});  // only 1: window
+    for (int b : {2, 3}) configs.push_back({b, 30, 0});           // only 1: number of bridges
+    for (int m : {3, 5, 10, 15}) configs.push_back({0, 30, m});   // only 2: number of nodes
+    for (int b : {1, 2, 3})                                       // both: bridges x nodes
+        for (int m : {3, 5, 10}) configs.push_back({b, 30, m});
+
+    std::vector<std::unique_ptr<ResultManager>> results;
+    std::vector<std::string> names;
+    std::vector<std::pair<std::string, const ResultManager*>> report_methods;
+    std::vector<std::pair<std::string, Task6Stats>> stats;
+    names.reserve(configs.size() + 1);
+    report_methods.reserve(configs.size() + 1);
+    stats.reserve(configs.size() + 1);
+
+    auto add_result = [&](const std::string& name, std::unique_ptr<ResultManager> result,
+                          const Task6Stats& method_stats) {
+        names.push_back(name);
+        report_methods.emplace_back(names.back(), result.get());
+        stats.emplace_back(names.back(), method_stats);
+        results.push_back(std::move(result));
+    };
+
+    const unsigned seed = 60000 + dataset;
+
+    // MSLS; its average running time is the time limit of ILS
+    auto msls = std::make_unique<ResultManager>();
+    msls->dataset = dataset;
+    const Task6Stats msls_stats = task6_msls(*msls, kMetaRuns, kMslsIterations, seed);
+    const double time_limit_ms = std::accumulate(msls->run_times_ms.begin(),
+                                                 msls->run_times_ms.end(), 0.0) /
+                                 msls->run_times_ms.size();
+    add_result("MSLS (" + std::to_string(kMslsIterations) + " x steepest LS with LM)",
+               std::move(msls), msls_stats);
+
+    for (const PerturbConfig& config : configs) {
+        auto result = std::make_unique<ResultManager>();
+        result->dataset = dataset;
+        const std::string name = task6_detail::perturb_name(config);
+        const Task6Stats method_stats =
+            task6_ils(*result, kMetaRuns, time_limit_ms, seed + 1, config);
+        add_result(name, std::move(result), method_stats);
+    }
+
+    write_local_search_report(output_path(6, "report", dataset), report_methods);
+    write_task6_stats(output_path(6, "report", dataset, "ls-runs"), stats);
+
+    // best solution of every variant in one file
+    std::ofstream file(output_path(6, "solution", dataset));
+    for (size_t i = 0; i < report_methods.size(); ++i) {
+        const ResultManager& r = *report_methods[i].second;
+        file << report_methods[i].first << " | best cost " << r.best_cost << "\n";
+        for (int j = 0; j < kSolutionSize; ++j) {
+            file << r.best_solution[j] << (j + 1 < kSolutionSize ? "," : "\n");
+        }
+    }
+    file.close();
+    task6_plot_from_file(dataset);
+}
+
+// Plot of selected variants taken from the file written by run_task6
+// (task6-solution-<dataset>.txt), so the plot and the lists of nodes in the
+// report come from exactly the same run. The cost of every solution is recomputed from the
+// distance matrix.
+void task6_plot_from_file(int dataset) {
+    const std::string path = output_path(6, "solution", dataset);
+    std::ifstream file(path);
+    if (!file.is_open()) return;
+    // (title in the plot, name prefix in the file)
+    const std::vector<std::pair<std::string, std::string>> wanted = {
+        {"MSLS", "MSLS"},
+        {"ILS only 1: W=30, b=3", "ILS only 1 (double bridge): W=30 b=3"},
+        {"ILS only 2: m=15", "ILS only 2 (node replacement): m=15"},
+        {"ILS both: W=30, b=2, m=10", "ILS both: W=30 b=2 m=10"}};
+    std::vector<std::unique_ptr<ResultManager>> results(wanted.size());
+    std::string header, line;
+    while (std::getline(file, header) && std::getline(file, line)) {
+        const std::string name = header.substr(0, header.find(" | best cost"));
+        for (size_t i = 0; i < wanted.size(); ++i) {
+            if (name != wanted[i].second && !(i == 0 && name.rfind("MSLS", 0) == 0)) continue;
+            std::vector<int> solution;
+            std::stringstream ss(line);
+            std::string item;
+            while (std::getline(ss, item, ',')) solution.push_back(std::stoi(item));
+            if (static_cast<int>(solution.size()) != kSolutionSize) continue;
+            results[i] = std::make_unique<ResultManager>();
+            results[i]->dataset = dataset;
+            results[i]->check_solution(solution.data(), kSolutionSize);
+        }
+    }
+    std::vector<PlotMethod> plot_methods;
+    for (size_t i = 0; i < wanted.size(); ++i) {
+        if (results[i]) plot_methods.push_back({wanted[i].first.c_str(), *results[i]});
+    }
+    generate_dataset_plot(dataset, plot_methods, plot_path(6, dataset));
+}
+
 }  // namespace
 
 int main(int argc, char** argv) {
     read_distance_matrix();
-    for (int task = 1; task <= 5; ++task) {
+    for (int task = 1; task <= 6; ++task) {
         std::filesystem::create_directories(kOutputDir + "task" + std::to_string(task));
     }
 
+    // optional argument: --task5 or --task6 runs only that task
+    const std::string only = argc > 1 ? argv[1] : "";
+    const bool all = only.empty();
+
     for (int dataset = 0; dataset < 2; ++dataset) {
-        std::cout << "\n--- Dataset " << dataset_name(dataset) << " ---" << std::endl;
-        const bool only_task5 = argc > 1 && std::string(argv[1]) == "--task5";
-        if (!only_task5) {
+        if (all) {
             run_task1(dataset);
             run_task2(dataset);
             run_task3(dataset);
             run_task4(dataset);
         }
-        run_task5(dataset);
-        run_task5_combined(dataset);
+        if (all || only == "--task5") {
+            run_task5(dataset);
+            run_task5_combined(dataset);
+        }
+        if (all || only == "--task6") {
+            run_task6(dataset);
+        }
     }
 }

@@ -1,0 +1,22 @@
+Number of runs of the basic local search per run of the method (average (minimum - maximum))
+Method                                                   LS runs: av (min - max)     Time limit [ms]
+MSLS (400 x steepest LS with LM)                               400.0 (400 - 400)                   -
+ILS only 1 (double bridge): W=10 b=1                        3559.5 (3415 - 3663)             480.936
+ILS only 1 (double bridge): W=20 b=1                        2912.6 (2700 - 3091)             480.936
+ILS only 1 (double bridge): W=30 b=1                        2609.2 (1530 - 2876)             480.936
+ILS only 1 (double bridge): W=50 b=1                        2437.9 (2268 - 2597)             480.936
+ILS only 1 (double bridge): W=30 b=2                        2206.4 (2025 - 2283)             480.936
+ILS only 1 (double bridge): W=30 b=3                        1902.6 (1746 - 2013)             480.936
+ILS only 2 (node replacement): m=3                          4081.4 (3488 - 4314)             480.936
+ILS only 2 (node replacement): m=5                          3148.3 (2951 - 3304)             480.936
+ILS only 2 (node replacement): m=10                         1761.3 (1404 - 2006)             480.936
+ILS only 2 (node replacement): m=15                          1292.3 (960 - 1437)             480.936
+ILS both: W=30 b=1 m=3                                      2260.6 (1946 - 2410)             480.936
+ILS both: W=30 b=1 m=5                                      2033.2 (1907 - 2120)             480.936
+ILS both: W=30 b=1 m=10                                     1560.2 (1360 - 1645)             480.936
+ILS both: W=30 b=2 m=3                                      1918.2 (1770 - 2052)             480.936
+ILS both: W=30 b=2 m=5                                      1758.1 (1588 - 1847)             480.936
+ILS both: W=30 b=2 m=10                                     1399.3 (1280 - 1492)             480.936
+ILS both: W=30 b=3 m=3                                      1722.0 (1542 - 1798)             480.936
+ILS both: W=30 b=3 m=5                                      1597.7 (1393 - 1685)             480.936
+ILS both: W=30 b=3 m=10                                     1337.3 (1303 - 1384)             480.936

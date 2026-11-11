@@ -5,5 +5,5 @@ Steepest + improving move list + random start                         52630.54 (
 
 Running times in milliseconds (average (minimum - maximum))
 Method                                                                Average (min - max)
-Steepest + edge exchange + random start (baseline)                      14.579 (12.729 - 16.418)
-Steepest + improving move list + random start                            1.537 (1.180 - 2.664)
+Steepest + edge exchange + random start (baseline)                      15.210 (13.205 - 22.246)
+Steepest + improving move list + random start                            1.219 (0.993 - 2.034)
