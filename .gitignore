@@ -2,3 +2,5 @@ test_reader
 test_runner
 test_reader.cpp
 .exe
+
+calculated_solutions/

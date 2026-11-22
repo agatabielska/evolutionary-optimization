@@ -7,6 +7,7 @@
 #include "solutions/task4.h"
 #include "solutions/task5.h"
 #include "solutions/task6.h"
+#include "solutions/task7.h"
 
 #include <chrono>
 #include <filesystem>
@@ -15,6 +16,7 @@
 #include <iostream>
 #include <memory>
 #include <numeric>
+#include <sstream>
 #include <string>
 #include <utility>
 #include <vector>
@@ -416,17 +418,287 @@ void task6_plot_from_file(int dataset) {
     generate_dataset_plot(dataset, plot_methods, plot_path(6, dataset));
 }
 
+// Task 7: shared baseline. MSLS is run ONCE per dataset and its average running time is
+// the single time limit of every time-limited method of Task 7 (ILS, the six mandatory
+// LNS variants and, if requested, the optional bad-node LNS variants), so all of them
+// get exactly the same time budget.
+struct Task7Baseline {
+    std::unique_ptr<ResultManager> msls;  // moved into the report by run_task7
+    double time_limit_ms = 0.0;
+};
+
+Task7Baseline make_task7_baseline(int dataset) {
+    Task7Baseline baseline;
+    baseline.msls = std::make_unique<ResultManager>();
+    baseline.msls->dataset = dataset;
+    task6_msls(*baseline.msls, kMetaRuns, kMslsIterations, 70000 + dataset);
+    baseline.time_limit_ms =
+        std::accumulate(baseline.msls->run_times_ms.begin(),
+                        baseline.msls->run_times_ms.end(), 0.0) /
+        baseline.msls->run_times_ms.size();
+    return baseline;
+}
+
+// Task 7: large neighborhood search.
+// The repair operator is the weighted greedy cycle (regret + insertion cost), the best
+// greedy heuristic from Task 2 (weights: see task7.h).
+// Every LNS variant starts from a random solution, applies steepest improving-move-list
+// local search once, and is given the shared MSLS time limit (Task7Baseline) as its
+// stopping limit.
+void run_task7(int dataset, Task7Baseline& baseline) {
+    constexpr int kMaxMethods = 12;
+    std::vector<std::unique_ptr<ResultManager>> results;
+    std::vector<std::string> names;  // reserved up front: plot_methods keeps c_str() pointers into it
+    std::vector<std::pair<std::string, const ResultManager*>> report_methods;
+    std::vector<std::pair<std::string, Task7Stats>> iteration_stats;
+    std::vector<PlotMethod> plot_methods;
+    results.reserve(kMaxMethods);
+    names.reserve(kMaxMethods);
+    report_methods.reserve(kMaxMethods);
+    iteration_stats.reserve(kMaxMethods);
+    plot_methods.reserve(kMaxMethods);
+
+    const unsigned seed = 70000 + dataset;
+    const double time_limit_ms = baseline.time_limit_ms;
+
+    auto add_result = [&](const std::string& name,
+                          std::unique_ptr<ResultManager> result,
+                          const Task7Stats& stats,
+                          bool include_in_plot = false) {
+        names.push_back(name);
+        report_methods.emplace_back(names.back(), result.get());
+        iteration_stats.emplace_back(names.back(), stats);
+        if (include_in_plot) plot_methods.push_back({names.back().c_str(), *result});
+        results.push_back(std::move(result));
+    };
+
+    // MSLS baseline: the shared run that defines the time limit.
+    add_result("MSLS (400 x steepest LS with LM)", std::move(baseline.msls), {}, false);
+
+    // ILS baseline: the selected two-component setting from Task 6.
+    auto ils = std::make_unique<ResultManager>();
+    ils->dataset = dataset;
+    task6_ils(*ils, kMetaRuns, time_limit_ms, seed + 1,
+              task6_detail::PerturbConfig{2, 30, 10});
+    add_result("ILS (double bridges b=2, window W=30, node replacement m=10)",
+               std::move(ils), {}, false);
+
+    // Best greedy heuristic from Assignment 2: greedy cycle with weighted regret.
+    auto greedy = std::make_unique<ResultManager>();
+    greedy->dataset = dataset;
+    run_and_save(*greedy, dataset, 7, "greedy-weighted",
+                 [](ResultManager& r) { task2_greedy_cycle_weighted(r); });
+    add_result("Greedy cycle (weighted)", std::move(greedy), {});
+
+    // Best local search from Assignment 5: steepest LS with the improving-move list.
+    auto best_ls = std::make_unique<ResultManager>();
+    best_ls->dataset = dataset;
+    const auto ls_starts = task4_make_random_starts(kRepetitions, 20260 + dataset);
+    task5_improving_list(*best_ls, ls_starts);
+    best_ls->save_best_solution_to_file(output_path(7, "solution", dataset, "best-local-search"),
+                                        kSolutionSize, "Steepest LS with improving move list");
+    add_result("Steepest LS + improving move list", std::move(best_ls), {});
+
+    for (bool use_ls : {false, true}) {
+        for (task7_detail::DestroyKind kind :
+             {task7_detail::DestroyKind::random_nodes,
+              task7_detail::DestroyKind::single_subpath,
+              task7_detail::DestroyKind::multiple_subpaths}) {
+            auto result = std::make_unique<ResultManager>();
+            result->dataset = dataset;
+            const Task7Stats stats =
+                task7_lns(*result, kMetaRuns, time_limit_ms, seed + 100,
+                          kind, use_ls);
+            const std::string name =
+                "LNS " + std::string(use_ls ? "with LS" : "without LS") +
+                " - " + task7_detail::destroy_name(kind);
+            const std::string description =
+                std::string(use_ls ? "with-ls-" : "without-ls-") +
+                (kind == task7_detail::DestroyKind::random_nodes ? "random"
+                 : kind == task7_detail::DestroyKind::single_subpath ? "single-subpath"
+                 : kind == task7_detail::DestroyKind::multiple_subpaths ? "multiple-subpaths"
+                 : "randomized-bad-nodes");
+            result->save_best_solution_to_file(output_path(7, "solution", dataset, description),
+                                               kSolutionSize, name);
+            add_result(name, std::move(result), stats, true);
+        }
+    }
+
+    write_local_search_report(output_path(7, "report", dataset), report_methods);
+    write_task7_stats(output_path(7, "report", dataset, "iterations"), iteration_stats);
+    generate_dataset_plot(dataset, plot_methods, plot_path(7, dataset));
+
+    std::ofstream file(output_path(7, "solution", dataset));
+    for (const auto& [name, result] : report_methods) {
+        file << name << " | best cost " << result->best_cost << '\n';
+        for (int i = 0; i < kSolutionSize; ++i) {
+            file << result->best_solution[i] << (i + 1 < kSolutionSize ? "," : "\n");
+        }
+    }
+}
+
+void run_task7_heuristic(int dataset, Task7Baseline& baseline) {
+    std::vector<std::unique_ptr<ResultManager>> results;
+    std::vector<std::string> names;
+    std::vector<std::pair<std::string, const ResultManager*>> report_methods;
+    std::vector<std::pair<std::string, Task7Stats>> iteration_stats;
+    std::vector<PlotMethod> plot_methods;
+
+    const unsigned seed = 71000 + dataset;
+    for (bool use_ls : {false, true}) {
+        auto result = std::make_unique<ResultManager>();
+        result->dataset = dataset;
+        const Task7Stats stats = task7_lns(
+            *result, kMetaRuns, baseline.time_limit_ms, seed,
+            task7_detail::DestroyKind::randomized_bad_nodes, use_ls, 30);
+        const std::string name =
+            "Optional heuristic LNS " + std::string(use_ls ? "with LS" : "without LS");
+        const std::string description =
+            std::string(use_ls ? "heuristic-with-ls" : "heuristic-without-ls");
+        result->save_best_solution_to_file(
+            output_path(7, "solution", dataset, description), kSolutionSize, name);
+        names.push_back(name);
+        report_methods.emplace_back(names.back(), result.get());
+        iteration_stats.emplace_back(names.back(), stats);
+        plot_methods.push_back({names.back().c_str(), *result});
+        results.push_back(std::move(result));
+    }
+
+    write_local_search_report(
+        output_path(7, "report", dataset, "heuristic"), report_methods);
+    write_task7_stats(
+        output_path(7, "report", dataset, "heuristic-iterations"), iteration_stats);
+    generate_dataset_plot(dataset, plot_methods,
+                          output_path(7, "plot", dataset, "heuristic", "svg"));
+
+    std::ofstream file(output_path(7, "solution", dataset, "heuristic"));
+    for (const auto& [name, result] : report_methods) {
+        file << name << " | best cost " << result->best_cost << '\n';
+        for (int i = 0; i < kSolutionSize; ++i) {
+            file << result->best_solution[i] << (i + 1 < kSolutionSize ? "," : "\n");
+        }
+    }
+}
+
+void run_task7_subpath_sweep(int dataset, Task7Baseline& baseline) {
+    std::vector<std::unique_ptr<ResultManager>> results;
+    std::vector<std::string> names;
+    std::vector<std::pair<std::string, const ResultManager*>> report_methods;
+    std::vector<std::pair<std::string, Task7Stats>> iteration_stats;
+    std::vector<PlotMethod> plot_methods;
+
+    for (int percentage = 10; percentage <= 70; percentage += 10) {
+        const int removed_total = percentage;
+        auto result = std::make_unique<ResultManager>();
+        result->dataset = dataset;
+        const unsigned seed = 72000 + dataset * 100 + percentage;
+        const Task7Stats stats = task7_lns(
+            *result, kMetaRuns, baseline.time_limit_ms, seed,
+            task7_detail::DestroyKind::multiple_subpaths, true, removed_total);
+        const std::string name =
+            "LNS with LS - 3-5 subpaths (" + std::to_string(percentage) +
+            "% removed)";
+        const std::string description =
+            "sweep-3-5-subpaths-" + std::to_string(percentage) + "pct";
+        result->save_best_solution_to_file(
+            output_path(7, "solution", dataset, description), kSolutionSize, name);
+        names.push_back(name);
+        report_methods.emplace_back(names.back(), result.get());
+        iteration_stats.emplace_back(names.back(), stats);
+        plot_methods.push_back({names.back().c_str(), *result});
+        results.push_back(std::move(result));
+    }
+
+    write_local_search_report(
+        output_path(7, "report", dataset, "subpath-sweep"), report_methods);
+    write_task7_stats(
+        output_path(7, "report", dataset, "subpath-sweep-iterations"), iteration_stats);
+    generate_dataset_plot(dataset, plot_methods,
+                          output_path(7, "plot", dataset, "subpath-sweep", "svg"));
+
+    std::ofstream file(output_path(7, "solution", dataset, "subpath-sweep"));
+    for (const auto& [name, result] : report_methods) {
+        file << name << " | best cost " << result->best_cost << '\n';
+        for (int i = 0; i < kSolutionSize; ++i) {
+            file << result->best_solution[i] << (i + 1 < kSolutionSize ? "," : "\n");
+        }
+    }
+}
+
+void merge_task7_heuristic_plots(int dataset) {
+        std::vector<ResultManager> results;
+        std::vector<std::string> names;
+        results.reserve(8);
+        names.reserve(8);
+
+        const std::vector<std::string> files = {
+            output_path(7, "solution", dataset),
+            output_path(7, "solution", dataset, "heuristic"),
+        };
+
+        for (const std::string& filename : files) {
+            std::ifstream file(filename);
+            if (!file.is_open()) continue;
+
+            std::string line;
+            while (std::getline(file, line)) {
+                const size_t separator = line.find(" | best cost ");
+                if (separator == std::string::npos) continue;
+
+                std::string name = line.substr(0, separator);
+                if (name.rfind("LNS ", 0) != 0 &&
+                    name.rfind("Optional heuristic LNS ", 0) != 0) {
+                    if (!std::getline(file, line)) break;
+                    continue;
+                }
+                const int cost = std::stoi(line.substr(separator + 13));
+                if (!std::getline(file, line)) break;
+
+                ResultManager result;
+                result.dataset = dataset;
+                result.best_cost = cost;
+                std::stringstream nodes(line);
+                std::string value;
+                int index = 0;
+                while (std::getline(nodes, value, ',') && index < kSolutionSize) {
+                    result.best_solution[index++] = std::stoi(value);
+                }
+                if (index != kSolutionSize) continue;
+
+                names.push_back(std::move(name));
+                results.push_back(std::move(result));
+            }
+        }
+
+        std::vector<PlotMethod> plot_methods;
+        plot_methods.reserve(results.size());
+        for (size_t i = 0; i < results.size(); ++i) {
+            plot_methods.push_back({names[i].c_str(), results[i]});
+        }
+        generate_dataset_plot(dataset, plot_methods, plot_path(7, dataset));
+}
+
 }  // namespace
 
 int main(int argc, char** argv) {
     read_distance_matrix();
-    for (int task = 1; task <= 6; ++task) {
+    for (int task = 1; task <= 7; ++task) {
         std::filesystem::create_directories(kOutputDir + "task" + std::to_string(task));
     }
 
-    // optional argument: --task5 or --task6 runs only that task
-    const std::string only = argc > 1 ? argv[1] : "";
-    const bool all = only.empty();
+    const bool all = argc == 1;
+    bool task5_only = false, task6_only = false, task7_only = false,
+         task7_heuristic_only = false, task7_sweep_only = false,
+         task7_plots_only = false;
+    for (int i = 1; i < argc; ++i) {
+        const std::string argument(argv[i]);
+        task5_only |= argument == "--task5";
+        task6_only |= argument == "--task6";
+        task7_only |= argument == "--task7";
+        task7_heuristic_only |= argument == "--task7-heuristic";
+        task7_sweep_only |= argument == "--task7-sweep";
+        task7_plots_only |= argument == "--task7-plots-only";
+    }
 
     for (int dataset = 0; dataset < 2; ++dataset) {
         if (all) {
@@ -435,12 +707,32 @@ int main(int argc, char** argv) {
             run_task3(dataset);
             run_task4(dataset);
         }
-        if (all || only == "--task5") {
+        if (all || task5_only) {
             run_task5(dataset);
             run_task5_combined(dataset);
         }
-        if (all || only == "--task6") {
+        if (task7_plots_only) {
+            merge_task7_heuristic_plots(dataset);
+        }
+        if (all || task6_only) {
             run_task6(dataset);
         }
+        if (all || task7_only || task7_heuristic_only || task7_sweep_only) {
+            // one MSLS run per dataset = one time limit for every Task 7 method
+            Task7Baseline baseline = make_task7_baseline(dataset);
+            if (all || task7_only) {
+                run_task7(dataset, baseline);
+                run_task7_heuristic(dataset, baseline);
+                run_task7_subpath_sweep(dataset, baseline);
+                merge_task7_heuristic_plots(dataset);
+            }
+            if (task7_heuristic_only) {
+                run_task7_heuristic(dataset, baseline);
+            }
+            if (task7_sweep_only) {
+                run_task7_subpath_sweep(dataset, baseline);
+            }
+        }
     }
+    return 0;
 }

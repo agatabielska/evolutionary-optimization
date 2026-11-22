@@ -130,6 +130,35 @@ def read_task5_moves(path: Path) -> dict[str, Result]:
     return results
 
 
+TASK7_ITERATIONS_LINE = re.compile(
+    r"^(.*?)\s+(-|\d+(?:\.\d+)?)\s+\((\d+)\s+-\s+(\d+)\)$"
+)
+
+
+def read_task7_iterations(path: Path) -> dict[str, tuple[float, int, int]]:
+    results: dict[str, tuple[float, int, int]] = {}
+    for line in path.read_text().splitlines():
+        match = TASK7_ITERATIONS_LINE.match(line)
+        if not match or match.group(1).strip() == "Method":
+            continue
+        average = None if match.group(2) == "-" else float(match.group(2))
+        if average is not None:
+            results[match.group(1).rstrip()] = (
+                average, int(match.group(3)), int(match.group(4)))
+    return results
+
+
+def read_combined_solutions(path: Path) -> dict[str, tuple[int, str]]:
+    results: dict[str, tuple[int, str]] = {}
+    lines = path.read_text().splitlines()
+    for index in range(0, len(lines), 2):
+        header = lines[index]
+        name = header[:header.find(" | best cost")]
+        cost = int(header.split(" | best cost ", 1)[1])
+        results[name] = (cost, lines[index + 1])
+    return results
+
+
 def best_solution(results_dir: Path, task: int, dataset: str, description: str) -> str:
     return read_key_values(solution_file(results_dir, task, dataset, description))["Best Solution"]
 
@@ -241,6 +270,46 @@ def task5_rows(results_dir: Path, dataset: str) -> list[Row]:
                             applied=counted.applied,
                             best_solution=best_solution(
                                 results_dir, 5, dataset, f"combined-{description}"))))
+    return rows
+
+
+TASK7_METHOD_NAMES = [
+    "LNS without LS - random 30 nodes",
+    "LNS without LS - single random subpath (30 nodes)",
+    "LNS without LS - 3-5 random subpaths (30 nodes)",
+    "LNS with LS - random 30 nodes",
+    "LNS with LS - single random subpath (30 nodes)",
+    "LNS with LS - 3-5 random subpaths (30 nodes)",
+]
+
+TASK7_HEURISTIC_NAMES = [
+    "Optional heuristic LNS without LS",
+    "Optional heuristic LNS with LS",
+]
+
+
+def task7_rows(results_dir: Path, dataset: str) -> list[Row]:
+    report = read_report(report_file(results_dir, 7, dataset))
+    solutions = read_combined_solutions(
+        results_dir / "task7" / f"task7-solution-{dataset.lower()}.txt")
+    rows = []
+    for name in TASK7_METHOD_NAMES:
+        cost, best = solutions[name]
+        category = ("lns_with_ls" if name.startswith("LNS with LS")
+                    else "lns_without_ls" if name.startswith("LNS without LS")
+                    else "lns")
+        rows.append(Row(name, category, replace(
+            report[name], minimum=cost, best_solution=best)))
+
+    heuristic_report = read_report(
+        report_file(results_dir, 7, dataset, "heuristic"))
+    heuristic_solutions = read_combined_solutions(
+        report_file(results_dir, 7, dataset, "heuristic")
+        .with_name(f"task7-solution-{dataset.lower()}-heuristic.txt"))
+    for name in TASK7_HEURISTIC_NAMES:
+        cost, best = heuristic_solutions[name]
+        rows.append(Row(name, "lns_heuristic", replace(
+            heuristic_report[name], minimum=cost, best_solution=best)))
     return rows
 
 
@@ -467,18 +536,222 @@ def task5_latex(results_dir: Path) -> str:
     ]) + "\n"
 
 
+def task7_iterations_table(results_dir: Path) -> str:
+    iterations_a = read_task7_iterations(
+        report_file(results_dir, 7, "TSPA", "iterations"))
+    iterations_b = read_task7_iterations(
+        report_file(results_dir, 7, "TSPB", "iterations"))
+    heuristic_iterations_a = read_task7_iterations(
+        report_file(results_dir, 7, "TSPA", "heuristic-iterations"))
+    heuristic_iterations_b = read_task7_iterations(
+        report_file(results_dir, 7, "TSPB", "heuristic-iterations"))
+    lns_names = TASK7_METHOD_NAMES + TASK7_HEURISTIC_NAMES
+    body = []
+    for index, name in enumerate(lns_names):
+        if index in (3, 6):
+            body.append(r"\cmidrule{1-3}")
+        if name.startswith("Optional"):
+            average_a, minimum_a, maximum_a = heuristic_iterations_a[name]
+            average_b, minimum_b, maximum_b = heuristic_iterations_b[name]
+        else:
+            average_a, minimum_a, maximum_a = iterations_a[name]
+            average_b, minimum_b, maximum_b = iterations_b[name]
+        body.append(
+            f"{name} & {average_a:.1f} ({minimum_a} -- {maximum_a}) & "
+            f"{average_b:.1f} ({minimum_b} -- {maximum_b}) \\\\")
+    header = (
+        r"\textbf{LNS variant} & \textbf{Instance A: av (min -- max)} & "
+        r"\textbf{Instance B: av (min -- max)} \\")
+    return table_lines(
+        r"Number of main-loop iterations of the LNS variants.",
+        "tab:task7_iterations",
+        r"p{8.3cm} X X",
+        header,
+        body)
+
+
+def task7_latex(results_dir: Path) -> str:
+    tspa, tspb = (task7_rows(results_dir, dataset) for dataset in DATASETS)
+    separators = (3, 6)
+    objective = metric_table(
+        tspa, tspb, fields=OBJECTIVE_FIELDS, decimals=0, separators=separators,
+        use_categories=True, label="tab:task7_obj",
+        header=(r"\textbf{Method} & \textbf{Instance A: av (min -- max)} & "
+                r"\textbf{Instance B: av (min -- max)} \\"),
+        caption=(r"Objective function values reported as \texttt{average (min -- max)} "
+                 r"across 20 runs. The LNS variants were stopped after the average running "
+                 r"time of MSLS (400 steepest local searches)."))
+    running_time = metric_table(
+        tspa, tspb, fields=TIME_FIELDS, decimals=3, separators=separators,
+        use_categories=True, label="tab:task7_time",
+        header=(r"\textbf{Method} & \textbf{Instance A [ms]: av (min -- max)} & "
+                r"\textbf{Instance B [ms]: av (min -- max)} \\"),
+        caption=(r"Running times in milliseconds reported as \texttt{average (min -- max)} "
+                 r"per single run across 20 runs."))
+    iterations = task7_iterations_table(results_dir)
+    try:
+        solution_tspa = tspa + task7_subpath_sweep_rows(results_dir, "TSPA")
+        solution_tspb = tspb + task7_subpath_sweep_rows(results_dir, "TSPB")
+    except (FileNotFoundError, KeyError):
+        solution_tspa = tspa
+        solution_tspb = tspb
+    sections = [
+        objective, running_time, iterations,
+        solution_section("TSPA", solution_tspa),
+        solution_section("TSPB", solution_tspb),
+    ]
+
+    try:
+        sections.append(task7_subpath_sweep_latex(results_dir))
+    except (FileNotFoundError, KeyError):
+        pass
+    return "\n\n".join(sections) + "\n"
+
+
+def task7_heuristic_latex(results_dir: Path) -> str:
+    rows_by_dataset = {}
+    for dataset in DATASETS:
+        report = read_report(report_file(results_dir, 7, dataset, "heuristic"))
+        solutions = read_combined_solutions(
+            report_file(results_dir, 7, dataset, "heuristic")
+            .with_name(f"task7-solution-{dataset.lower()}-heuristic.txt"))
+        rows = []
+        for name in TASK7_HEURISTIC_NAMES:
+            cost, best = solutions[name]
+            rows.append(Row(name, "heuristic", replace(
+                report[name], minimum=cost, best_solution=best)))
+        rows_by_dataset[dataset] = rows
+
+    tspa = rows_by_dataset["TSPA"]
+    tspb = rows_by_dataset["TSPB"]
+    objective = metric_table(
+        tspa, tspb, fields=OBJECTIVE_FIELDS, decimals=0, separators=(),
+        use_categories=False, label="tab:task7_heuristic_obj",
+        header=(r"\textbf{Optional heuristic method} & "
+                r"\textbf{Instance A: av (min -- max)} & "
+                r"\textbf{Instance B: av (min -- max)} \\"),
+        caption=(r"Optional separate experiment for randomized bad-node removal "
+                 r"(30 nodes). Probability is weighted by node cost and the maximum "
+                 r"length of the two adjacent cycle edges."))
+    running_time = metric_table(
+        tspa, tspb, fields=TIME_FIELDS, decimals=3, separators=(),
+        use_categories=False, label="tab:task7_heuristic_time",
+        header=(r"\textbf{Optional heuristic method} & "
+                r"\textbf{Instance A [ms]: av (min -- max)} & "
+                r"\textbf{Instance B [ms]: av (min -- max)} \\"),
+        caption=(r"Running times for the optional randomized bad-node LNS experiment."))
+
+    iteration_rows = []
+    for dataset in DATASETS:
+        iterations = read_task7_iterations(
+            report_file(results_dir, 7, dataset, "heuristic-iterations"))
+        iteration_rows.append((dataset, iterations))
+    body = []
+    for name in TASK7_HEURISTIC_NAMES:
+        a = iteration_rows[0][1][name]
+        b = iteration_rows[1][1][name]
+        body.append(
+            f"{name} & {a[0]:.1f} ({a[1]} -- {a[2]}) & "
+            f"{b[0]:.1f} ({b[1]} -- {b[2]}) \\\\")
+    iterations = table_lines(
+        r"Number of iterations in the optional randomized bad-node LNS experiment.",
+        "tab:task7_heuristic_iterations",
+        r"p{8.3cm} X X",
+        (r"\textbf{Optional heuristic method} & "
+         r"\textbf{Instance A: av (min -- max)} & "
+         r"\textbf{Instance B: av (min -- max)} \\"),
+        body)
+    return "\n\n".join([
+        objective, running_time, iterations,
+        solution_section("TSPA", tspa),
+        solution_section("TSPB", tspb),
+    ])
+
+
+def task7_subpath_sweep_names() -> list[str]:
+    return [
+        f"LNS with LS - 3-5 subpaths ({percentage}% removed)"
+        for percentage in range(10, 71, 10)
+    ]
+
+
+def task7_subpath_sweep_rows(results_dir: Path, dataset: str) -> list[Row]:
+    names = task7_subpath_sweep_names()
+    report = read_report(
+        report_file(results_dir, 7, dataset, "subpath-sweep"))
+    solutions = read_combined_solutions(
+        report_file(results_dir, 7, dataset, "subpath-sweep")
+        .with_name(f"task7-solution-{dataset.lower()}-subpath-sweep.txt"))
+    rows = []
+    for name in names:
+        cost, best = solutions[name]
+        rows.append(Row(name, "lns_subpath_sweep", replace(
+            report[name], minimum=cost, best_solution=best)))
+    return rows
+
+
+def task7_subpath_sweep_latex(results_dir: Path) -> str:
+    names = [
+        *task7_subpath_sweep_names()
+    ]
+    tspa = task7_subpath_sweep_rows(results_dir, "TSPA")
+    tspb = task7_subpath_sweep_rows(results_dir, "TSPB")
+    objective = metric_table(
+        tspa, tspb, fields=OBJECTIVE_FIELDS, decimals=0, separators=(),
+        use_categories=False, label="tab:task7_subpath_sweep_obj",
+        header=(r"\textbf{LNS method} & "
+                r"\textbf{Instance A: av (min -- max)} & "
+                r"\textbf{Instance B: av (min -- max)} \\"),
+        caption=(r"Separate experiment with local search and 3--5 random subpaths "
+                 r"removed at 10\%--70\% of the 100-node cycle."))
+    running_time = metric_table(
+        tspa, tspb, fields=TIME_FIELDS, decimals=3, separators=(),
+        use_categories=False, label="tab:task7_subpath_sweep_time",
+        header=(r"\textbf{LNS method} & "
+                r"\textbf{Instance A [ms]: av (min -- max)} & "
+                r"\textbf{Instance B [ms]: av (min -- max)} \\"),
+        caption=(r"Running times for the 3--5-subpath removal percentage sweep."))
+
+    iteration_rows = []
+    for dataset in DATASETS:
+        iterations = read_task7_iterations(
+            report_file(results_dir, 7, dataset, "subpath-sweep-iterations"))
+        iteration_rows.append(iterations)
+    body = []
+    for name in names:
+        a = iteration_rows[0][name]
+        b = iteration_rows[1][name]
+        body.append(
+            f"{name} & {a[0]:.1f} ({a[1]} -- {a[2]}) & "
+            f"{b[0]:.1f} ({b[1]} -- {b[2]}) \\\\")
+    iterations = table_lines(
+        r"Number of iterations in the 3--5-subpath removal percentage sweep.",
+        "tab:task7_subpath_sweep_iterations",
+        r"p{8.3cm} X X",
+        (r"\textbf{LNS method} & "
+         r"\textbf{Instance A: av (min -- max)} & "
+         r"\textbf{Instance B: av (min -- max)} \\"),
+        body)
+    return "\n\n".join([
+        objective, running_time, iterations,
+        solution_section("TSPA", tspa),
+        solution_section("TSPB", tspb),
+    ])
+
+
 def longest_list_time(rows: list[Row]) -> float:
     return max((row.result.lists_ms for row in rows if row.result.lists_ms is not None),
                default=0.0)
 
 
-GENERATORS = {"3": task3_latex, "4": task4_latex, "5": task5_latex}
+GENERATORS = {"3": task3_latex, "4": task4_latex, "5": task5_latex,
+              "7": task7_latex}
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--results-dir", type=Path, default=Path("calculated_solutions"))
-    parser.add_argument("--task", choices=["3", "4", "5", "all"], default="all")
+    parser.add_argument("--task", choices=["3", "4", "5", "7", "all"], default="all")
     args = parser.parse_args()
 
     tasks = list(GENERATORS) if args.task == "all" else [args.task]

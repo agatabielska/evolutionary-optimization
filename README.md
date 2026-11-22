@@ -226,6 +226,14 @@ logic is included directly from the headers.
 
     ./evolutionary-optimization
 
+Optional Task 7 runs:
+
+    ./evolutionary-optimization --task7
+    ./evolutionary-optimization --task7-heuristic
+
+`--task7` runs only the six required LNS variants. The heuristic is kept as a
+separate experiment and is included only when `--task7-heuristic` is passed.
+
 
 ## Troubleshooting
 
