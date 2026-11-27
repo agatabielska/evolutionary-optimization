@@ -7,7 +7,7 @@ Greedy cycle (weighted)                                               57892.50 (
 
 Running times in milliseconds (average (minimum - maximum))
 Method                                                                Average (min - max)
-Nearest neighbor (regret)                                                1.622 (1.622 - 1.622)
-Nearest neighbor (weighted)                                              1.694 (1.694 - 1.694)
-Greedy cycle (regret)                                                    3.004 (3.004 - 3.004)
-Greedy cycle (weighted)                                                  2.891 (2.891 - 2.891)
+Nearest neighbor (regret)                                                1.577 (1.577 - 1.577)
+Nearest neighbor (weighted)                                              1.580 (1.580 - 1.580)
+Greedy cycle (regret)                                                    2.865 (2.865 - 2.865)
+Greedy cycle (weighted)                                                  2.886 (2.886 - 2.886)

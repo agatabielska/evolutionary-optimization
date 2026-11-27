@@ -1,0 +1,12 @@
+Number of LNS main-loop iterations per run (average (minimum - maximum))
+Method                                                                    Iterations: av (min - max)
+MSLS (400 x steepest LS with LM)                                                                   -
+ILS (double bridges b=2, window W=30, node replacement m=10)                                       -
+Greedy cycle (weighted)                                                                            -
+Steepest LS + improving move list                                                                  -
+LNS without LS - random 30 nodes                                                   380.9 (341 - 400)
+LNS without LS - single random subpath (30 nodes)                                  396.4 (361 - 408)
+LNS without LS - 3-5 random subpaths (30 nodes)                                    392.2 (373 - 402)
+LNS with LS - random 30 nodes                                                      356.6 (315 - 377)
+LNS with LS - single random subpath (30 nodes)                                     356.7 (329 - 377)
+LNS with LS - 3-5 random subpaths (30 nodes)                                       362.7 (338 - 382)

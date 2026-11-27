@@ -1,0 +1,9 @@
+Objective values (average (minimum - maximum))
+Method                                                                Average (min - max)
+Optional heuristic LNS without LS                                     49274.10 (48482 - 50200)
+Optional heuristic LNS with LS                                        49130.30 (48352 - 50073)
+
+Running times in milliseconds (average (minimum - maximum))
+Method                                                                Average (min - max)
+Optional heuristic LNS without LS                                      457.743 (457.131 - 458.224)
+Optional heuristic LNS with LS                                         457.719 (457.196 - 458.696)

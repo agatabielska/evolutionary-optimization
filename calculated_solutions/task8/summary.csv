@@ -1,0 +1,13 @@
+instance,version,measure,pearson_r,spearman_r,points
+TSPA,avg,edges,-0.646646,-0.633220,1000
+TSPA,best1000,edges,-0.458118,-0.454136,999
+TSPA,reference,edges,-0.570588,-0.557231,1000
+TSPA,avg,nodes,-0.440476,-0.397257,1000
+TSPA,best1000,nodes,-0.598598,-0.585648,999
+TSPA,reference,nodes,-0.673205,-0.658158,1000
+TSPB,avg,edges,-0.690807,-0.668305,1000
+TSPB,best1000,edges,-0.410662,-0.387408,999
+TSPB,reference,edges,-0.622724,-0.611741,1000
+TSPB,avg,nodes,-0.452944,-0.409256,1000
+TSPB,best1000,nodes,-0.468242,-0.435438,999
+TSPB,reference,nodes,-0.623989,-0.599162,1000

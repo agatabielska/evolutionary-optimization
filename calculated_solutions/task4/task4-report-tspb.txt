@@ -8,8 +8,8 @@ Steepest + candidate moves (k = 20) + random start                    52580.29 (
 
 Running times in milliseconds (average (minimum - maximum))
 Method                                                                Average (min - max)
-Steepest + edge exchange + random start (baseline)                      15.704 (13.306 - 34.032)
-Steepest + candidate moves (k = 5) + random start                        0.772 (0.542 - 1.361)
-Steepest + candidate moves (k = 10) + random start                       1.306 (1.078 - 2.277)
-Steepest + candidate moves (k = 15) + random start                       1.923 (1.603 - 2.794)
-Steepest + candidate moves (k = 20) + random start                       2.547 (2.195 - 3.697)
+Steepest + edge exchange + random start (baseline)                      15.774 (13.372 - 55.126)
+Steepest + candidate moves (k = 5) + random start                        0.598 (0.503 - 0.897)
+Steepest + candidate moves (k = 10) + random start                       1.240 (1.030 - 2.000)
+Steepest + candidate moves (k = 15) + random start                       1.852 (1.534 - 2.617)
+Steepest + candidate moves (k = 20) + random start                       2.562 (2.145 - 4.148)

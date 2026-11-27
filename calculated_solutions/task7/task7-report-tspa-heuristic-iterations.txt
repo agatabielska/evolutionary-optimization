@@ -1,0 +1,4 @@
+Number of LNS main-loop iterations per run (average (minimum - maximum))
+Method                                                                    Iterations: av (min - max)
+Optional heuristic LNS without LS                                                  386.4 (342 - 404)
+Optional heuristic LNS with LS                                                     365.2 (313 - 381)

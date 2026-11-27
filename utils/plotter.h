@@ -3,9 +3,12 @@
 #include "reader.h"
 #include "result_manager.h"
 #include <algorithm>
+#include <cmath>
 #include <filesystem>
 #include <fstream>
+#include <iomanip>
 #include <iostream>
+#include <limits>
 #include <string>
 #include <vector>
 
@@ -116,6 +119,133 @@ inline void generate_dataset_plot(int dataset, const std::vector<PlotMethod>& me
                          max_cost);
     }
 
+    file << "</svg>\n";
+    std::cout << "Saved plot: " << output_path << '\n';
+}
+
+struct ScatterPlotPoint {
+    double x;
+    double y;
+};
+
+inline std::string escape_svg_text(const std::string& text) {
+    std::string escaped;
+    for (char character : text) {
+        if (character == '&') escaped += "&amp;";
+        else if (character == '<') escaped += "&lt;";
+        else if (character == '>') escaped += "&gt;";
+        else if (character == '"') escaped += "&quot;";
+        else escaped += character;
+    }
+    return escaped;
+}
+
+inline void generate_scatter_plot(const std::vector<ScatterPlotPoint>& points,
+                                  const std::string& title,
+                                  const std::string& x_label,
+                                  const std::string& y_label,
+                                  double pearson_r,
+                                  const std::string& output_path) {
+    constexpr int width = 900;
+    constexpr int height = 650;
+    constexpr double left = 95.0;
+    constexpr double right = 35.0;
+    constexpr double top = 75.0;
+    constexpr double bottom = 85.0;
+    const double plot_width = width - left - right;
+    const double plot_height = height - top - bottom;
+
+    const std::filesystem::path parent =
+        std::filesystem::path(output_path).parent_path();
+    if (!parent.empty()) std::filesystem::create_directories(parent);
+
+    std::ofstream file(output_path);
+    if (!file.is_open()) {
+        std::cerr << "Error opening scatter plot: " << output_path << '\n';
+        return;
+    }
+
+    double min_x = std::numeric_limits<double>::infinity();
+    double max_x = -std::numeric_limits<double>::infinity();
+    double min_y = std::numeric_limits<double>::infinity();
+    double max_y = -std::numeric_limits<double>::infinity();
+    for (const ScatterPlotPoint& point : points) {
+        min_x = std::min(min_x, point.x);
+        max_x = std::max(max_x, point.x);
+        min_y = std::min(min_y, point.y);
+        max_y = std::max(max_y, point.y);
+    }
+    const double x_padding = max_x == min_x ? 1.0 : (max_x - min_x) * 0.04;
+    const double y_padding = max_y == min_y ? 1.0 : (max_y - min_y) * 0.08;
+    min_x -= x_padding;
+    max_x += x_padding;
+    min_y -= y_padding;
+    max_y += y_padding;
+
+    auto x_position = [&](double value) {
+        return left + (value - min_x) * plot_width / (max_x - min_x);
+    };
+    auto y_position = [&](double value) {
+        return top + plot_height -
+               (value - min_y) * plot_height / (max_y - min_y);
+    };
+
+    file << "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"" << width
+         << "\" height=\"" << height << "\" viewBox=\"0 0 " << width << ' '
+         << height << "\">\n"
+         << "<rect width=\"100%\" height=\"100%\" fill=\"white\"/>\n"
+         << "<text x=\"" << width / 2 << "\" y=\"35\" text-anchor=\"middle\" "
+            "font-family=\"sans-serif\" font-size=\"20\">"
+         << escape_svg_text(title) << " (Pearson r=";
+    if (std::isfinite(pearson_r)) {
+        file << std::fixed << std::setprecision(4) << pearson_r;
+    } else {
+        file << "NA";
+    }
+    file << ")</text>\n";
+
+    for (int tick = 0; tick <= 5; ++tick) {
+        const double fraction = tick / 5.0;
+        const double x = left + fraction * plot_width;
+        const double y = top + fraction * plot_height;
+        const double x_value = min_x + fraction * (max_x - min_x);
+        const double y_value = max_y - fraction * (max_y - min_y);
+        file << "<line x1=\"" << x << "\" y1=\"" << top << "\" x2=\""
+             << x << "\" y2=\"" << top + plot_height
+             << "\" stroke=\"#e5e5e5\"/>\n"
+             << "<line x1=\"" << left << "\" y1=\"" << y << "\" x2=\""
+             << left + plot_width << "\" y2=\"" << y
+             << "\" stroke=\"#e5e5e5\"/>\n"
+             << "<text x=\"" << x << "\" y=\"" << top + plot_height + 22
+             << "\" text-anchor=\"middle\" font-family=\"sans-serif\" "
+                "font-size=\"12\">"
+             << std::fixed << std::setprecision(1) << x_value << "</text>\n"
+             << "<text x=\"" << left - 10 << "\" y=\"" << y + 4
+             << "\" text-anchor=\"end\" font-family=\"sans-serif\" "
+                "font-size=\"12\">"
+             << std::fixed << std::setprecision(1) << y_value << "</text>\n";
+    }
+    file << "<line x1=\"" << left << "\" y1=\"" << top + plot_height
+         << "\" x2=\"" << left + plot_width << "\" y2=\"" << top + plot_height
+         << "\" stroke=\"#333\"/>\n"
+         << "<line x1=\"" << left << "\" y1=\"" << top << "\" x2=\""
+         << left << "\" y2=\"" << top + plot_height
+         << "\" stroke=\"#333\"/>\n"
+         << "<text x=\"" << left + plot_width / 2 << "\" y=\"" << height - 25
+         << "\" text-anchor=\"middle\" font-family=\"sans-serif\" "
+            "font-size=\"15\">"
+         << escape_svg_text(x_label) << "</text>\n"
+         << "<text x=\"22\" y=\"" << top + plot_height / 2
+         << "\" transform=\"rotate(-90 22 " << top + plot_height / 2
+         << ")\" text-anchor=\"middle\" font-family=\"sans-serif\" "
+            "font-size=\"15\">"
+         << escape_svg_text(y_label) << "</text>\n";
+
+    for (const ScatterPlotPoint& point : points) {
+        file << "<circle cx=\"" << x_position(point.x) << "\" cy=\""
+             << y_position(point.y)
+             << "\" r=\"2.5\" fill=\"#2864a5\" fill-opacity=\"0.55\"/>\n";
+    }
     file << "</svg>\n";
     std::cout << "Saved plot: " << output_path << '\n';
 }

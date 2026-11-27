@@ -200,8 +200,20 @@ Expected console output:
 The program prints the dataset headers and the two generated SVG file names for
 each dataset.
 
-Plot generation happens after the result timers are stopped, so it does not
-contribute to the reported method times.
+With no arguments, the program runs Tasks 1 through 8 in order, for both
+instances, and saves the global-convexity data, charts, and summary under
+`calculated_solutions/task8`. Plot generation happens after the
+result timers are stopped, so it does not contribute to the reported method
+times.
+
+To run only one task, pass its flag, for example:
+
+    .\evolutionary-optimization.exe --task4
+    .\evolutionary-optimization.exe --task8
+
+The same `--task1` through `--task8` form is available for every task. Task 8
+uses the saved Task 6 results as its reference, so run Task 6 first if invoking
+`--task8` on its own and the Task 6 files do not already exist.
 
 ## Running on Linux
 
@@ -226,13 +238,45 @@ logic is included directly from the headers.
 
     ./evolutionary-optimization
 
-Optional Task 7 runs:
+Task 7 sub-experiments:
 
     ./evolutionary-optimization --task7
     ./evolutionary-optimization --task7-heuristic
+    ./evolutionary-optimization --task7-sweep
 
-`--task7` runs only the six required LNS variants. The heuristic is kept as a
-separate experiment and is included only when `--task7-heuristic` is passed.
+`--task7` runs Task 7, including its heuristic and subpath sweep.
+
+## Global convexity experiment
+
+The global convexity experiment runs automatically as Task 8 at the end of the
+standard no-argument run. To run only this experiment for both instances:
+
+    .\evolutionary-optimization.exe --global-convexity
+
+The default is 1,000 random starts per instance, seed `20261126`, and output
+directory `calculated_solutions/task8`. The edge-exchange greedy
+neighborhood and inter-route node replacement reuse the Task 3 first-improvement
+search and random-solution generator; costs use the Task 4 objective evaluator.
+Override the defaults with `--global-convexity-n <count>`,
+`--global-convexity-seed <seed>`, and `--global-convexity-output <directory>`.
+Use at least three runs so every correlation version has enough points.
+
+The experiment saves one JSON file of local optima and six SVG scatter plots
+per instance, plus one combined CSV correlation table, in
+`calculated_solutions/task8`. With 100 of the 200
+nodes selected, two independently random solutions are expected to share about
+0.503 edges and 50 selected nodes (the full-node TSP edge baseline does not
+apply here). The reference is always the `ILS both: W=30 b=2 m=10` entry in
+`calculated_solutions/task6/task6-solution-tspa.txt` or
+`calculated_solutions/task6/task6-solution-tspb.txt`, respectively. The
+default run executes Task 6 before Task 8, refreshing those result files.
+Task 8 verifies that the selected cycle's recomputed objective matches its
+saved cost.
+
+The best-of-sample chart excludes its own best local optimum. Edges are
+normalized as undirected pairs, and average similarity excludes only the same
+run (duplicate optima from different runs remain included). As the objective
+is minimized, negative quality-similarity correlations are expected.
 
 
 ## Troubleshooting

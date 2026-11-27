@@ -8,6 +8,7 @@
 #include "solutions/task5.h"
 #include "solutions/task6.h"
 #include "solutions/task7.h"
+#include "solutions/task8.h"
 
 #include <chrono>
 #include <filesystem>
@@ -17,6 +18,7 @@
 #include <memory>
 #include <numeric>
 #include <sstream>
+#include <stdexcept>
 #include <string>
 #include <utility>
 #include <vector>
@@ -682,56 +684,136 @@ void merge_task7_heuristic_plots(int dataset) {
 
 int main(int argc, char** argv) {
     read_distance_matrix();
-    for (int task = 1; task <= 7; ++task) {
+    for (int task = 1; task <= 8; ++task) {
         std::filesystem::create_directories(kOutputDir + "task" + std::to_string(task));
     }
 
     const bool all = argc == 1;
-    bool task5_only = false, task6_only = false, task7_only = false,
-         task7_heuristic_only = false, task7_sweep_only = false,
-         task7_plots_only = false;
+    int selected_task = 0;
+    bool task7_only = false;
+    bool task7_heuristic_only = false;
+    bool task7_sweep_only = false;
+    bool task7_plots_only = false;
+    int global_convexity_runs = 1000;
+    unsigned global_convexity_seed = 20261126;
+    std::string global_convexity_output = "calculated_solutions/task8";
+    auto select_task = [&](int task) {
+        if (selected_task != 0 && selected_task != task) {
+            throw std::invalid_argument("Select only one --taskN option at a time.");
+        }
+        selected_task = task;
+    };
+
     for (int i = 1; i < argc; ++i) {
         const std::string argument(argv[i]);
-        task5_only |= argument == "--task5";
-        task6_only |= argument == "--task6";
-        task7_only |= argument == "--task7";
-        task7_heuristic_only |= argument == "--task7-heuristic";
-        task7_sweep_only |= argument == "--task7-sweep";
-        task7_plots_only |= argument == "--task7-plots-only";
+        if (argument.size() == 7 && argument.compare(0, 6, "--task") == 0 &&
+            argument[6] >= '1' && argument[6] <= '8') {
+            const int task = argument[6] - '0';
+            select_task(task);
+            task7_only |= task == 7;
+        } else if (argument == "--global-convexity") {
+            select_task(8);
+        } else if (argument == "--task7-heuristic") {
+            select_task(7);
+            task7_heuristic_only = true;
+        } else if (argument == "--task7-sweep") {
+            select_task(7);
+            task7_sweep_only = true;
+        } else if (argument == "--task7-plots-only") {
+            select_task(7);
+            task7_plots_only = true;
+        } else if (argument == "--global-convexity-n") {
+            if (i + 1 >= argc) {
+                throw std::invalid_argument("--global-convexity-n requires a count.");
+            }
+            global_convexity_runs = std::stoi(argv[++i]);
+        } else if (argument == "--global-convexity-seed") {
+            if (i + 1 >= argc) {
+                throw std::invalid_argument("--global-convexity-seed requires a seed.");
+            }
+            global_convexity_seed = static_cast<unsigned>(std::stoul(argv[++i]));
+        } else if (argument == "--global-convexity-output") {
+            if (i + 1 >= argc) {
+                throw std::invalid_argument("--global-convexity-output requires a directory.");
+            }
+            global_convexity_output = argv[++i];
+        } else {
+            throw std::invalid_argument("Unknown option: " + argument);
+        }
     }
 
-    for (int dataset = 0; dataset < 2; ++dataset) {
-        if (all) {
-            run_task1(dataset);
-            run_task2(dataset);
-            run_task3(dataset);
-            run_task4(dataset);
+    if (all) selected_task = 0;
+    if (selected_task == 0) {
+        if (!all) {
+            throw std::invalid_argument(
+                "Choose a task with --task1 through --task8 (or run with no arguments).");
         }
-        if (all || task5_only) {
-            run_task5(dataset);
-            run_task5_combined(dataset);
+        selected_task = 1;
+    }
+
+    if (task7_heuristic_only && task7_sweep_only) {
+        throw std::invalid_argument(
+            "--task7-heuristic and --task7-sweep are separate Task 7 modes.");
+    }
+    if (task7_plots_only) {
+        if (task7_heuristic_only || task7_sweep_only) {
+            throw std::invalid_argument("--task7-plots-only cannot be combined with other modes.");
         }
-        if (task7_plots_only) {
+        for (int dataset = 0; dataset < 2; ++dataset) {
             merge_task7_heuristic_plots(dataset);
         }
-        if (all || task6_only) {
-            run_task6(dataset);
-        }
-        if (all || task7_only || task7_heuristic_only || task7_sweep_only) {
-            // one MSLS run per dataset = one time limit for every Task 7 method
-            Task7Baseline baseline = make_task7_baseline(dataset);
-            if (all || task7_only) {
-                run_task7(dataset, baseline);
-                run_task7_heuristic(dataset, baseline);
-                run_task7_subpath_sweep(dataset, baseline);
-                merge_task7_heuristic_plots(dataset);
-            }
-            if (task7_heuristic_only) {
-                run_task7_heuristic(dataset, baseline);
-            }
-            if (task7_sweep_only) {
-                run_task7_subpath_sweep(dataset, baseline);
-            }
+        return 0;
+    }
+
+    for (int task = selected_task; task <= 8; ++task) {
+        if (!all && task != selected_task) break;
+        switch (task) {
+            case 1:
+                for (int dataset = 0; dataset < 2; ++dataset) run_task1(dataset);
+                break;
+            case 2:
+                for (int dataset = 0; dataset < 2; ++dataset) run_task2(dataset);
+                break;
+            case 3:
+                for (int dataset = 0; dataset < 2; ++dataset) run_task3(dataset);
+                break;
+            case 4:
+                for (int dataset = 0; dataset < 2; ++dataset) run_task4(dataset);
+                break;
+            case 5:
+                for (int dataset = 0; dataset < 2; ++dataset) {
+                    run_task5(dataset);
+                    run_task5_combined(dataset);
+                }
+                break;
+            case 6:
+                for (int dataset = 0; dataset < 2; ++dataset) run_task6(dataset);
+                break;
+            case 7:
+                for (int dataset = 0; dataset < 2; ++dataset) {
+                    // Task 7 uses a shared MSLS-derived time limit for its methods.
+                    Task7Baseline baseline = make_task7_baseline(dataset);
+                    if (task7_only || all) {
+                        run_task7(dataset, baseline);
+                        run_task7_heuristic(dataset, baseline);
+                        run_task7_subpath_sweep(dataset, baseline);
+                        merge_task7_heuristic_plots(dataset);
+                    } else if (task7_heuristic_only) {
+                        run_task7_heuristic(dataset, baseline);
+                    } else if (task7_sweep_only) {
+                        run_task7_subpath_sweep(dataset, baseline);
+                    } else {
+                        run_task7(dataset, baseline);
+                    }
+                }
+                break;
+            case 8:
+                for (int dataset = 0; dataset < 2; ++dataset) {
+                    run_global_convexity(dataset, global_convexity_runs,
+                                         global_convexity_seed,
+                                         global_convexity_output);
+                }
+                break;
         }
     }
     return 0;

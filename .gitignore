@@ -3,4 +3,4 @@ test_runner
 test_reader.cpp
 .exe
 
-calculated_solutions/
+#calculated_solutions/
