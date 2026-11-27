@@ -1,302 +1,71 @@
-# evolutionary-optimization
-
-
-## The problem
-
-We are given 200 nodes on a plane, each with (x, y) coordinates and a node cost.
-Distances are Euclidean, rounded to the nearest integer.
-
-The goal is to select exactly **100 of the 200 nodes** and connect them into a
-**closed cycle** so that the objective is minimal:
-
-    objective = (sum of edge lengths in the cycle) + (sum of costs of the selected nodes)
-
-Two instances are used: `TSPA` and `TSPB`.
-
-## What is implemented
-
-### Assignment 1: greedy heuristics
-
-| Method | Description |
-| --- | --- |
-| Random | Pick 100 random nodes in random order. 200 runs. |
-| Nearest neighbor, end of path | Start from a node, repeatedly append the node with the smallest (distance + node cost) to the end of the path. |
-| Nearest neighbor, any position | Same idea, but a new node may be added at the beginning, at the end, or inside the path. The best change of the objective is chosen. |
-| Greedy cycle | Start from a node, add its best neighbour to form a 2-node cycle, then keep inserting the node + position with the smallest increase of the objective. |
-
-### Assignment 2: greedy regret heuristics
-
-Two construction frameworks (the extended nearest neighbor, i.e. a path where
-a node may be inserted at the beginning, at the end or inside, and the greedy
-cycle) are combined with two selection criteria, which gives four methods.
-
-| Method | Framework | Selection criterion |
-| --- | --- | --- |
-| Nearest neighbor (any position) + 2-regret | path | `c2 - c1` |
-| Nearest neighbor (any position) + weighted sum | path | `w1 * (c2 - c1) - w2 * c1` |
-| Greedy cycle + 2-regret | cycle | `c2 - c1` |
-| Greedy cycle + weighted sum | cycle | `w1 * (c2 - c1) - w2 * c1` |
-
-How the regret methods work:
-
-1. In every iteration, for **each unvisited node** the increase of the objective
-   (edge length change + node cost) is computed for **every possible insertion
-   position** of the current partial solution.
-2. For each node, `c1` is the best (smallest) insertion cost, `c2` is the
-   second best one, and `pos1` is the position where `c1` occurs.
-3. Each node gets a score. The node with the **largest score** is chosen and
-   inserted at **its own best position** `pos1`.
-4. Ties are broken by the smaller `c1`, then by the smaller node index.
-
-The criteria:
-
-* **2-regret:** `score = c2 - c1`. A node that would lose a lot if it did not
-  get its best position now is inserted first.
-* **Weighted sum:** `score = w1 * (c2 - c1) - w2 * c1`. It combines the regret
-  with the greedy criterion (the best change of the objective, which should
-  be small, hence the minus). By default `w1 = w2 = 0.5`. Other values can be
-  passed as arguments of the functions, e.g.
-  `task2_greedy_cycle_weighted(result_manager, 0.25, 0.75)`.
-
-### Assignment 3: local search
-
-Local search uses the objective-function delta for every move; it never builds
-a neighbor and reevaluates the complete objective while exploring a
-neighborhood. The implemented variants combine:
-
-* steepest descent or greedy descent;
-* intra-route exchange of two nodes or two edges (2-opt);
-* random or weighted nearest-neighbor starting solutions.
-
-The inter-route neighborhood always exchanges one selected node with one
-unselected node. The steepest version evaluates the complete combined
-neighborhood and applies its best improving move. The greedy version creates
-the complete list of move descriptors, shuffles that list with a
-`std::mt19937` generator seeded from `std::random_device`, and evaluates moves
-in that order until the first improving move is found. Thus inter- and
-intra-route moves are mixed, and the greedy version does not evaluate the
-whole neighborhood before choosing a move.
-
-Each of the eight combinations is run 200 times. Random starts are generated
-by shuffling all 200 nodes and keeping the first 100. Greedy starts use the
-weighted nearest-neighbor construction from Assignment 2, with starting nodes
-0 through 199. The objective and running-time tables are written to
-`calculated_solutions/task3/`. Individual local-search results and best-solution
-plots are written to the corresponding task directory.
+<div align="center">
 
-### Assignment 5: improving move list
+# Evolutionary Optimization
 
-Task 5 compares the Task 4 steepest baseline with a steepest search that keeps
-a list of improving move deltas between iterations. The list contains both
-inter-route exchanges and 2-opt edge exchanges. Saved edge directions are
-checked when browsing the list: disappeared edges invalidate a move, one
-reversed edge defers it, and two consistently reversed edges remain
-applicable. New moves are evaluated for both relative edge orientations.
-Both methods use the same 200 random starting solutions for each instance.
-Task 5 reports objective values, running times, and evaluated/added/applied
-move counts.
+**Heuristics and local search for a node-selection cycle problem**
 
-Sanity checks for the weighted methods: with `w1 = 0` the criterion reduces to
-pure greedy (it should reproduce the corresponding Assignment 1 results), with
-`w2 = 0` it reduces to pure 2-regret.
+<a href="https://isocpp.org/"><img src="https://img.shields.io/badge/C%2B%2B-17-00599C?logo=cplusplus&logoColor=white" alt="C++17"></a>
+<a href="https://gcc.gnu.org/"><img src="https://img.shields.io/badge/GCC-C%2B%2B%20compiler-4A8B3B?logo=gnu&logoColor=white" alt="GCC"></a>
+<a href="https://www.python.org/"><img src="https://img.shields.io/badge/Python-3-3776AB?logo=python&logoColor=white" alt="Python 3"></a>
 
-Every method (in both assignments) is run once from each of the 200 starting
-nodes, so you get 200 solutions per method and instance. Random search also
-makes 200 solutions.
+</div>
 
-## Project layout
+## Problem
 
-    .
-    ├── main.cpp                  entry point, runs all methods on both instances
-    ├── solutions/
-    │   ├── task1.h               Assignment 1: random, nearest neighbor (end of path / any position), greedy cycle
-    │   └── task2.h               Assignment 2: 2-regret and weighted-sum variants of nearest neighbor (any position) and greedy cycle
-    ├── utils/
-    │   ├── reader.h              CSV reader, distance matrix, node costs
-    │   ├── euclidean.h           rounded Euclidean distance
-    │   ├── result_manager.h      objective evaluation, best/worst/avg, saving results
-    │   └── plotter.h             creates 2D SVG plots after all methods finish
-    ├── data/
-    │   ├── TSPA.csv              instance A
-    │   └── TSPB.csv              instance B
-    └── calculated_solutions/
-        ├── task1/                Assignment 1 outputs
-        ├── task2/                Assignment 2 outputs
-        ├── task3/                Assignment 3 outputs
-        ├── task4/                Assignment 4 outputs
-        └── task5/                Assignment 5 outputs
+For each instance, select **100 of 200 planar nodes** and connect them into a
+closed cycle. Minimize the sum of rounded Euclidean edge lengths and selected
+node costs. The project includes instances **TSPA** and **TSPB**.
 
-Each data file has 200 lines in the form `x;y;cost`.
+## Experiments
 
-## Output
+| Task | Methods |
+|---|---|
+| 1 | Random, nearest-neighbor and greedy-cycle construction |
+| 2 | Regret and weighted-regret construction |
+| 3 | Greedy/steepest local search with node or edge exchange |
+| 4 | Steepest local search with candidate lists |
+| 5 | Improving-move-list local search, with combined variants |
+| 6 | Multi-start and iterated local search (MSLS/ILS) |
+| 7 | Large-neighborhood search, heuristics and parameter sweeps |
+| 8 | Global-convexity analysis of 1,000 greedy-search local optima |
 
-For every method and instance a text file is written to its
-`calculated_solutions/task<N>/` directory.
-The file name contains the task, method, and dataset (`tspa` = TSPA,
-`tspb` = TSPB), e.g. `task2-solution-tspa-cycle-regret.txt`. Each file has the
-following content:
+Tasks run for both instances. The standard run executes **Tasks 1–8 in order**.
+Task 8 compares common undirected edges and selected nodes, creates scatter
+plots, and reports Pearson and Spearman correlations.
 
-    Best Cost: ...
-    Worst Cost: ...
-    Average Cost: ...
-    Time: ... ms
-    Best Solution: n1,n2,...,n100
+## Build and run
 
-`Best Solution` is the list of the 100 selected nodes in the order of the cycle
-(the last node is connected back to the first one).
+Requires a C++17 compiler. From the repository root:
 
-In addition, an SVG summary is generated for each dataset after all methods are
-processed. The task-1 plot is saved as `TSPA_best_solutions.svg` or
-`TSPB_best_solutions.svg`, and the task-2 plot is saved as
-`TSPA_task2_best_solutions.svg` or `TSPB_task2_best_solutions.svg`.
-Each image contains one panel per method; the chosen 100-node cycle is drawn on
-top of the nodes, which are colored by node cost.
+```powershell
+g++ -std=c++17 -O2 main.cpp -o evolutionary-optimization.exe
+.\evolutionary-optimization.exe
+```
 
-## Requirements
+Run one task only with `--task1` through `--task8`, for example:
 
-* A C++17-compatible compiler (g++ is used below)
-* The program must be started from the **repository root**, because the
-  paths `./data/...` and `calculated_solutions/...` are relative.
+```powershell
+.\evolutionary-optimization.exe --task4
+.\evolutionary-optimization.exe --task8
+```
 
-## Running on Windows
+Task 8 uses the `ILS both: W=30 b=2 m=10` reference saved by Task 6. Run Task 6
+first when invoking `--task8` on its own if no Task 6 results are present.
+Task 7 also supports `--task7-heuristic` and `--task7-sweep`. Task 8 accepts
+`--global-convexity-n`, `--global-convexity-seed`, and
+`--global-convexity-output` to customize its run count, seed, and output path.
 
-### 1. Install g++
+## Results and layout
 
-The easiest way is MSYS2 with the MinGW-w64 toolchain.
+Generated reports and plots are written under `calculated_solutions/task<N>/`.
+Task 8 writes its local-optima JSON, six SVG charts per instance, and combined
+correlation CSV to `calculated_solutions/task8/`.
 
-1. Install MSYS2 from https://www.msys2.org/
-2. Open the *MSYS2 UCRT64* terminal and run:
-
-       pacman -S mingw-w64-ucrt-x86_64-gcc
-
-3. Add `C:\msys64\ucrt64\bin` to your `PATH`.
-4. Open a new PowerShell and check:
-
-       g++ --version
-
-### 2. Build
-
-In PowerShell, from the repository root:
-
-    g++ -std=c++17 -O2 main.cpp -o evolutionary-optimization.exe
-
-Adding `-O2` is recommended, the nearest neighbor (any position), greedy
-cycle and regret methods are noticeably faster with optimizations on.
-
-### 3. Run
-
-    .\evolutionary-optimization.exe
-
-Expected console output:
-
-    --- Dataset TSPA ---
-    Saved plot: calculated_solutions/task1/task1-plot-tspa.svg
-    Saved plot: calculated_solutions/task2/task2-plot-tspa.svg
-
-    --- Dataset TSPB ---
-    Saved plot: calculated_solutions/task1/task1-plot-tspb.svg
-    Saved plot: calculated_solutions/task2/task2-plot-tspb.svg
-
-The program prints the dataset headers and the two generated SVG file names for
-each dataset.
-
-With no arguments, the program runs Tasks 1 through 8 in order, for both
-instances, and saves the global-convexity data, charts, and summary under
-`calculated_solutions/task8`. Plot generation happens after the
-result timers are stopped, so it does not contribute to the reported method
-times.
-
-To run only one task, pass its flag, for example:
-
-    .\evolutionary-optimization.exe --task4
-    .\evolutionary-optimization.exe --task8
-
-The same `--task1` through `--task8` form is available for every task. Task 8
-uses the saved Task 6 results as its reference, so run Task 6 first if invoking
-`--task8` on its own and the Task 6 files do not already exist.
-
-## Running on Linux
-
-### 1. Install g++
-
-Debian / Ubuntu:
-
-    sudo apt update
-    sudo apt install build-essential
-
-### 2. Build
-
-From the repository root:
-
-    mkdir -p calculated_solutions
-    g++ -std=c++17 -O2 main.cpp -o evolutionary-optimization
-
-This project does not require any `.cpp` files from `utils` or `solutions`; all
-logic is included directly from the headers.
-
-### 3. Run
-
-    ./evolutionary-optimization
-
-Task 7 sub-experiments:
-
-    ./evolutionary-optimization --task7
-    ./evolutionary-optimization --task7-heuristic
-    ./evolutionary-optimization --task7-sweep
-
-`--task7` runs Task 7, including its heuristic and subpath sweep.
-
-## Global convexity experiment
-
-The global convexity experiment runs automatically as Task 8 at the end of the
-standard no-argument run. To run only this experiment for both instances:
-
-    .\evolutionary-optimization.exe --global-convexity
-
-The default is 1,000 random starts per instance, seed `20261126`, and output
-directory `calculated_solutions/task8`. The edge-exchange greedy
-neighborhood and inter-route node replacement reuse the Task 3 first-improvement
-search and random-solution generator; costs use the Task 4 objective evaluator.
-Override the defaults with `--global-convexity-n <count>`,
-`--global-convexity-seed <seed>`, and `--global-convexity-output <directory>`.
-Use at least three runs so every correlation version has enough points.
-
-The experiment saves one JSON file of local optima and six SVG scatter plots
-per instance, plus one combined CSV correlation table, in
-`calculated_solutions/task8`. With 100 of the 200
-nodes selected, two independently random solutions are expected to share about
-0.503 edges and 50 selected nodes (the full-node TSP edge baseline does not
-apply here). The reference is always the `ILS both: W=30 b=2 m=10` entry in
-`calculated_solutions/task6/task6-solution-tspa.txt` or
-`calculated_solutions/task6/task6-solution-tspb.txt`, respectively. The
-default run executes Task 6 before Task 8, refreshing those result files.
-Task 8 verifies that the selected cycle's recomputed objective matches its
-saved cost.
-
-The best-of-sample chart excludes its own best local optimum. Edges are
-normalized as undirected pairs, and average similarity excludes only the same
-run (duplicate optima from different runs remain included). As the objective
-is minimized, negative quality-similarity correlations are expected.
-
-
-## Troubleshooting
-
-**`Error opening file: ./data/TSPA.csv`**
-You are not in the repository root, or the `data` folder is missing.
-`cd` into the project folder and run the executable from there.
-
-**`Error opening file for writing: calculated_solutions/...`**
-The `calculated_solutions` folder does not exist. Create it in project root (New-Item -ItemType Directory -Force calculated_solutions for Windows) and run again.
-
-**`g++` is not recognized (Windows)**
-The MinGW `bin` folder is not on your `PATH`. Add it and restart PowerShell.
-
-**Structured binding / `auto [x, y]` errors**
-The installed compiler is too old for C++17. This project uses structured
-bindings in `task1.h`, so install a newer GCC (for example from MSYS2's
-`mingw-w64-ucrt-x86_64-gcc` toolchain) and rebuild with `-std=c++17`.
-
-**Linker error about multiple definitions**
-Functions in the headers are not marked `inline`. This only shows up if a
-`.cpp` file in `utils/` or `solutions/` includes them. Either mark them
-`inline` or build with just `main.cpp`.
+```text
+data/                     TSPA and TSPB instance data (x;y;cost)
+solutions/                Task 1–8 implementations
+utils/                    Instance reader, objective/result utilities, SVG plots
+scripts/                  Supporting Python utilities
+calculated_solutions/     Per-task reports, solutions and charts
+main.cpp                  Program entry point and task dispatcher
+```
